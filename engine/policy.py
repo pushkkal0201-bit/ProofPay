@@ -1,9 +1,21 @@
 """Reviewed accounting and legal inputs. All rates are annual basis points."""
 from datetime import date
+from decimal import Decimal
+import re
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BeforeValidator, BaseModel, ConfigDict, Field, model_validator
 
-Money = Annotated[int, Field(strict=True, ge=0, le=10**11)]
+def exact_money(value):
+    """Integer input is paise; fixed-point strings are INR. Never accept a JSON float."""
+    if isinstance(value, str):
+        if not re.fullmatch(r"[0-9]{1,10}\.[0-9]{1,2}", value):
+            raise ValueError("Use integer paise or an INR string with one or two decimal places.")
+        return int(Decimal(value) * 100)
+    return value
+
+
+Money = Annotated[int, Field(strict=True, ge=0, le=10**11),
+                  BeforeValidator(exact_money, json_schema_input_type=int | str)]
 Rate = Annotated[int, Field(strict=True, gt=0, le=10000)]
 Ref = Annotated[str, Field(min_length=1, max_length=300)]
 

@@ -1,87 +1,29 @@
 """Deterministic policy. Imported evidence is a human-reviewed attestation."""
-import hashlib
 import os
-import re
 from datetime import timedelta
 from .models import Case
-from engine.accrual import aging, effective_due, estimate
-from engine.intake import parse_record
-from engine.packet import breakdown, packet
+from proofpay.services.ledger import LedgerService
+from proofpay.services.causal import CausalVerificationService
+from proofpay.services.tax import TaxComplianceService
+from proofpay.services.escalation import EscalationEngine
+from engine.packet import packet
 
 
 def rupees(paise):
     return f"INR {paise // 100:,}.{paise % 100:02d}"
 
 
-def evidence_for(case, line):
-    records = [e for e in case.evidence if e.verified and e.invoice == case.invoice
-               and e.line == line.id and e.timestamp.date() <= case.as_of]
-    conflicting_files = [e.id for e in records if e.attachment and hashlib.sha256(
-        e.attachment.text.encode("utf-8")).hexdigest() != e.attachment.sha256]
-    metadata_conflicts = []
-    for e in records:
-        if not e.attachment or e.id in conflicting_files:
-            continue
-        fields = parse_record(e.attachment.text)["fields"]
-        expected = {"invoice": e.invoice, "line": e.line}
-        if e.signer:
-            expected["signer"] = e.signer
-        if e.quantity:
-            expected["quantity"] = str(e.quantity)
-        if any(key in fields and fields[key] != value for key,value in expected.items()):
-            metadata_conflicts.append(e.id)
-    records = [e for e in records if e.id not in conflicting_files and e.id not in metadata_conflicts]
-    accepted = {"POD", "BOL"} if line.kind == "goods" else {"acceptance"}
-    # Require one complete receipt; two copies of a partial receipt cannot add up.
-    receipt = next((e for e in records if e.kind in accepted and e.signer
-                    and (e.quantity or 0) >= line.quantity), None)
-    metric = next((e for e in records if e.kind == "telemetry" and e.covers_contract_period
-                   and line.uptime_target_bps is not None and e.uptime_bps is not None
-                   and e.uptime_bps >= line.uptime_target_bps), None)
-    gaps = [f"Attachment checksum mismatch: {key}." for key in conflicting_files]
-    gaps.extend(f"Attachment fields conflict with evidence metadata: {key}." for key in metadata_conflicts)
-    if not receipt:
-        gaps.append("Full-quantity signed receipt or acceptance required.")
-    if line.uptime_target_bps is not None and not metric:
-        gaps.append("Period-matched telemetry meeting the contract target required.")
-    if line.uptime_target_bps is not None and any(
-            e.kind == "telemetry" and e.covers_contract_period and e.uptime_bps is not None
-            and e.uptime_bps < line.uptime_target_bps for e in records):
-        gaps.append("A verified period report records uptime below the contract target.")
-    if case.dispute == "performance":
-        gaps.append("Reviewer must resolve the specific performance objection.")
-    anchors = [e.model_dump(mode="json") for e in (receipt, metric) if e]
-    anchors.extend(e.model_dump(mode="json") for e in records if e.kind == "eway")
-    return dict(line=line.id, description=line.description, clause=line.clause,
-                quantity=line.quantity, target_bps=line.uptime_target_bps, anchors=anchors, gaps=gaps)
-
-
-def analyze(case: Case):
-    matrix = dict(principal=sum(l.principal for l in case.lines), gst=sum(l.gst for l in case.lines),
-                  debit=0, credit=0, payment=0, interest=0)
-    for entry in case.ledger:
-        if entry.approved:
-            matrix[entry.kind] += entry.base + entry.gst
-    net = matrix["principal"] + matrix["gst"] + matrix["debit"] - matrix["credit"] - matrix["payment"]
-    due = effective_due(case)
-    dpd = max(0, (case.as_of - due).days)
-    age = (case.as_of - case.issued).days
-    bucket = aging(dpd)
-    accrual = estimate(case, due)
-    proof = [evidence_for(case, line) for line in case.lines]
-    gst_match = bool(re.fullmatch(r"[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]", case.gstin)
-                     and case.gstin == case.master_gstin and case.buyer == case.master_name)
-    row = case.statement_row
-    statement = "Unavailable"
-    if row:
-        match = (row.invoice == case.invoice and row.issued == case.issued
-                 and row.recipient_gstin == case.gstin and row.supplier_gstin == case.supplier_gstin
-                 and row.principal == matrix["principal"] and row.gst == matrix["gst"])
-        if row.split:
-            amounts = breakdown([(line, 1) for line in case.lines])
-            match = match and not amounts.pop("unallocated") and amounts == row.split.model_dump()
-        statement = "Matched" if match else "Mismatch"
-    reasons = []
+def analyze(case: Case, *, verifier=None):
+    ledger = LedgerService()
+    matrix, net = ledger.reconcile(case)
+    due, dpd, bucket, accrual, statutory = EscalationEngine.clock(case)
+    proof = (verifier or CausalVerificationService()).evaluate(case)
+    tax = TaxComplianceService.evaluate(case, matrix, net, ledger)
+    statement = tax["statement"]
+    gst_match = tax["master_match"]
+    reasons = list(tax["issues"])
+    if case.msme_registered and not case.terms:
+        reasons.append("Confirm supplier classification, acceptance and terms before escalation.")
     if case.contact.contact_paused:
         reasons.append("Buyer contact is paused.")
     if accrual["amount"] is None:
@@ -100,30 +42,7 @@ def analyze(case: Case):
         reasons.append("Reconcile pending ledger entries.")
     if case.reverse_charge:
         reasons.append("Review reverse-charge tax treatment before collection.")
-    if net <= 0:
-        state = "Credit balance" if net < 0 else "Settled"
-    elif reasons:
-        state = "Review hold"
-    elif dpd == 0:
-        state = "Current"
-    elif dpd <= 30:
-        state = "Reminder"
-    elif dpd <= 45:
-        state = "Reconciliation"
-    elif case.terms and case.terms.basis == "msmed":
-        state = "MSE legal review"
-    else:
-        state = "Manager review"
-    actions = {
-        "Credit balance": "Reconcile the excess receipt with the buyer account.",
-        "Settled": "Close the case after confirming the bank posting.",
-        "Current": "Monitor until the contractual due date.",
-        "Review hold": "Resolve each flagged item and import a corrected snapshot.",
-        "Reminder": "Review a reminder requesting a payment date.",
-        "Reconciliation": "Review the evidence packet and request a line-specific response within two calendar days.",
-        "MSE legal review": "Prepare a section 18 MSEFC referral assessment for the legal reviewer.",
-        "Manager review": "Assign a credit manager to review the contract, dispute history and account terms.",
-    }
+    state, action = EscalationEngine.decide(case, net, dpd, reasons)
     draft = None
     deadline = None
     if state in ("Reminder", "Reconciliation", "MSE legal review", "Manager review"):
@@ -147,7 +66,7 @@ def analyze(case: Case):
         draft += f"\n\nAccounts receivable\n{case.creditor}"
     report = dict(invoice=case.invoice, buyer=case.buyer, as_of=str(case.as_of), due=str(due),
                 matrix=matrix, balance=net, collectible=max(net,0), dpd=dpd, bucket=bucket,
-                state=state, action=actions[state], statement=statement, reasons=reasons, proof=proof, master_match=gst_match,
-                itc_review=net>0 and age>=180 and not case.reverse_charge, draft=draft, response_by=str(deadline) if deadline else None)
+                state=state, action=action, statement=statement, reasons=reasons, proof=proof, master_match=gst_match,
+                tax_compliance=tax, statutory_clock=statutory, itc_review=tax["review"], draft=draft, response_by=str(deadline) if deadline else None)
     report.update(packet(case, report, due, accrual))
     return report

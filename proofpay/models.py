@@ -4,12 +4,12 @@ import hashlib
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 from datetime import date
-from engine.policy import ContactPolicy, TaxSplit, Terms
+from engine.policy import ContactPolicy, Money, TaxSplit, Terms
 from typing import Annotated, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
-Amount = Annotated[int, Field(strict=True, ge=0, le=10**11)]
+Amount = Money
 Quantity = Annotated[int, Field(strict=True, gt=0, le=10**8)]
 Bps = Annotated[int, Field(strict=True, ge=0, le=10000)]
 
@@ -18,7 +18,24 @@ class Record(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class Coordinates(Record):
+    # Integer microdegrees keep comparisons and signed payloads lossless.
+    lat_e6: Annotated[int, Field(strict=True, ge=-90000000, le=90000000)]
+    lon_e6: Annotated[int, Field(strict=True, ge=-180000000, le=180000000)]
+
+
+class DeliveryZone(Coordinates):
+    tolerance_e6: Annotated[int, Field(strict=True, ge=0, le=1000000)]
+
+
+class Signature(Record):
+    key_id: Text
+    ed25519_base64: Annotated[str, Field(min_length=88, max_length=88)]
+
+
 class Line(Record):
+    delivery_zone: DeliveryZone | None = None
+    require_signature: bool = False
     id: Text
     description: Text
     kind: Literal["goods", "service"]
@@ -58,6 +75,8 @@ class Crop(Record):
 
 
 class Evidence(Record):
+    signature: Signature | None = None
+    coordinates: Coordinates | None = None
     crop: Crop | None = None
     attachment: Attachment | None = None
     id: Text
@@ -96,6 +115,11 @@ class StatementRow(Record):
 
 
 class Case(Record):
+    msme_registered: bool | None = None
+    place_of_supply: Annotated[str, Field(pattern="^[0-9]{2}$")] | None = None
+    sez_supply: bool = False
+    statement_expected_on: date | None = None
+    itc_availed: bool | None = None
     contact: ContactPolicy = Field(default_factory=ContactPolicy)
     terms: Terms | None = None
     supplier_gstin: Text | None = None
@@ -118,6 +142,12 @@ class Case(Record):
 
     @model_validator(mode="after")
     def check_snapshot(self):
+        if max(self.issued, self.due, self.as_of).year > 9900:
+            raise ValueError("Dates exceed the supported projection horizon.")
+        if self.msme_registered is False and self.terms and self.terms.basis == "msmed":
+            raise ValueError("MSE terms conflict with negative registration verification.")
+        if self.statement_expected_on and self.statement_expected_on < self.issued:
+            raise ValueError("Statement observation window cannot precede invoice issue.")
         if min(self.as_of, self.due) < self.issued:
             raise ValueError("Snapshot and due date must be on or after issue.")
         for entry in [*self.lines, *self.ledger, *([self.statement_row] if self.statement_row else [])]:

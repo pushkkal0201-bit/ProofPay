@@ -2,7 +2,11 @@
 
 **An evidence-first B2B receivables workbench for Indian invoices.** ProofPay reconciles an invoice, checks whether delivery or service records support its individual lines, and prepares a collection draft when those checks pass. RAV-AI suggests the next review task. A person decides what to send.
 
-**Stack** · Python 3.11+ · Pydantic v2 · SQLite · React 18 · strict TypeScript · Tailwind CSS · optional local Ollama · GitHub Actions
+**Stack** · Python 3.11+ · FastAPI · Pydantic v2 · SQLite · React 18 · strict TypeScript · Tailwind CSS · optional local Ollama · GitHub Actions
+
+## Backend decision API
+
+The [FastAPI backend guide](BACKEND.md) includes Windows setup, an executable ingestion example, OpenAPI access, evidence signing, tax clocks, and the local throughput benchmark. The four services power both API and workbench decisions. Batched writes use an atomic journal with optimistic concurrency and replay protection. [Service implementations](proofpay/services) · [Edge-case tests](tests/test_services.py) · [Transaction and concurrency tests](tests/test_decision_api.py)
 
 ## Try it in two minutes
 
@@ -164,6 +168,7 @@ An operator can set `PROOFPAY_REMITTANCE` to a verified payment instruction befo
 
 ```sh
 python -m proofpay --analyze examples/PP-1042.json
+python -m pip install -r requirements-test.txt
 python -m unittest discover -s tests -v
 ```
 

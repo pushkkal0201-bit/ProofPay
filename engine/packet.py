@@ -1,4 +1,7 @@
 """Serialize the audit packet consumed by API, CLI and the review desk."""
+from decimal import Decimal
+
+
 def breakdown(records):
     taxes = dict(cgst=0, sgst=0, igst=0, unallocated=0)
     for row, sign in records:
@@ -30,7 +33,7 @@ def packet(case, report, due, accrual):
     whatsapp = None
     if email and case.contact.whatsapp_opt_in:
         whatsapp = (f"{case.creditor} to {case.buyer} accounts payable: please review {case.invoice}. "
-                    f"Outstanding INR {summary['total_owed']/100:,.2f}; evidence {', '.join(refs)}. "
+                    f"Outstanding INR {Decimal(summary['total_owed'])/100:,.2f}; evidence {', '.join(refs)}. "
                     f"Please confirm a payment date or identify the disputed line by {report['response_by']}.")
     return dict(LEDGER_SUMMARY=summary, CAUSAL_ANCHOR=report["proof"],
                 TRANSACTION_STRATEGY=dict(tier=report["state"], action=report["action"], holds=report["reasons"]),

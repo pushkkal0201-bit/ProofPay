@@ -1,6 +1,7 @@
 """Interest estimates in paise. Reviewed gross basis; opening-of-day cash posting."""
 from calendar import monthrange
 from collections import defaultdict
+from itertools import pairwise
 from datetime import timedelta
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -49,32 +50,32 @@ def estimate(case, due):
     pending = Decimal(0)
     rate_index = 0
     rates = t.rates
-    day = start
-    segment = None
-    while day <= case.as_of:
+    stop = case.as_of + DAY
+    boundaries = {start, stop}
+    boundaries.update(d for d in postings if start < d < stop)
+    boundaries.update(r.effective for r in rates if start < r.effective < stop)
+    month = start.replace(day=1)
+    while month < stop:
+        month += timedelta(days=monthrange(month.year, month.month)[1])
+        if start < month < stop:
+            boundaries.add(month)
+
+    for day, following in pairwise(sorted(boundaries)):
         balance += postings.get(day, 0)
-        rate = t.annual_bps
-        source = t.authority_ref
+        rate, source = t.annual_bps, t.authority_ref
         if rates:
             while rate_index + 1 < len(rates) and rates[rate_index + 1].effective <= day:
                 rate_index += 1
             rate = rates[rate_index].bank_rate_bps * 3
             source = rates[rate_index].source
         base = max(0, balance)
-        if segment is None or (base, rate, source) != (segment["balance"], segment["annual_bps"], segment["source"]):
-            segment = dict(start=str(day), end=str(day), balance=base, annual_bps=rate, source=source,
-                           opening_capitalized=rounded(capital), days=0)
-            result["audit"].append(segment)
-        segment.update(end=str(day), days=segment["days"]+1)
-        accrual = (base + capital) * rate / Decimal(3650000)
-        pending += accrual
-        if day.day == monthrange(day.year, day.month)[1]:
-            if t.basis == "msmed":
-                capital += pending
-                pending = Decimal(0)
-            segment = None
-        if day == case.as_of:
-            break
-        day += DAY
+        days = (following - day).days
+        result["audit"].append(dict(start=str(day), end=str(following-DAY), days=days,
+                                    balance=base, annual_bps=rate, source=source,
+                                    opening_capitalized=rounded(capital)))
+        pending += (base + capital) * rate * days / Decimal(3650000)
+        if following.day == 1 and t.basis == "msmed":
+            capital += pending
+            pending = Decimal(0)
     result["amount"] = rounded(capital + pending)
     return result
