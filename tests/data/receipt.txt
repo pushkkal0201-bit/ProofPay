@@ -1,0 +1,7 @@
+Delivered against the purchase order in line with handover requirements.
+Invoice: PP-1047
+Line: L1
+e-Way bill: EWAY-884102
+Received by: Demo warehouse lead
+Delivered at: 2026-08-27 11:30:00 IST
+Quantity: 2

@@ -1,0 +1,179 @@
+{
+  "cases": [
+    {
+      "creditor": "Meridian Systems Pvt Ltd",
+      "buyer": "Kaveri Machine Works",
+      "gstin": "27ABCDE1234F1Z9",
+      "master_gstin": "27ABCDE1234F1Z9",
+      "master_name": "Kaveri Machine Works",
+      "invoice": "PP-1047",
+      "issued": "2026-08-25",
+      "due": "2026-10-24",
+      "as_of": "2026-12-15",
+      "dispute": "non_receipt",
+      "dispute_text": "Please confirm whether both pump units arrived.",
+      "lines": [
+        {
+          "id": "L1",
+          "description": "Industrial pump assemblies",
+          "kind": "goods",
+          "quantity": 2,
+          "principal": 15000000,
+          "gst": 2700000,
+          "clause": "PO-717 §4 · delivery of two units",
+          "split": {
+            "cgst": 1350000,
+            "sgst": 1350000,
+            "igst": 0
+          }
+        }
+      ],
+      "evidence": [
+        {
+          "id": "POD-817",
+          "invoice": "PP-1047",
+          "line": "L1",
+          "kind": "POD",
+          "timestamp": "2026-08-27T14:22:00+05:30",
+          "source": "Receiving register / folio 817",
+          "reviewer": "Demo controller",
+          "verified": true,
+          "signer": "R. Shah, receiving supervisor",
+          "quantity": 2,
+          "attachment": {
+            "filename": "POD-817.txt",
+            "text": "SYNTHETIC DEMO RECORD\nPOD POD-817 | PP-1047 | L1\nRecorded 2026-08-27T14:22:00+05:30\nQuantity accepted: 2\nAcknowledged by: R. Shah, receiving supervisor\n",
+            "sha256": "3e23bfac9c5fcf2c9ff739ed7b80e31a3c45e9631e65c72a822740c89ddfc5a3"
+          }
+        }
+      ],
+      "ledger": [
+        {
+          "id": "PAY-18",
+          "kind": "payment",
+          "date": "2026-11-12",
+          "base": 4000000,
+          "gst": 0,
+          "approved": true
+        },
+        {
+          "id": "CN-19",
+          "kind": "credit",
+          "date": "2026-10-02",
+          "base": 500000,
+          "gst": 90000,
+          "approved": true,
+          "split": {
+            "cgst": 45000,
+            "sgst": 45000,
+            "igst": 0
+          }
+        }
+      ],
+      "supplier_gstin": "27FGHIJ4321K1Z0",
+      "statement_row": {
+        "invoice": "PP-1047",
+        "issued": "2026-08-25",
+        "recipient_gstin": "27ABCDE1234F1Z9",
+        "supplier_gstin": "27FGHIJ4321K1Z0",
+        "principal": 15000000,
+        "gst": 2700000,
+        "split": {
+          "cgst": 1350000,
+          "sgst": 1350000,
+          "igst": 0
+        }
+      },
+      "terms": {
+        "basis": "msmed",
+        "authority_ref": "DEMO eligibility memo M-17 / signed payment terms",
+        "supplier_class": "small",
+        "acceptance": "2026-08-27",
+        "written_agreement": true,
+        "rates": [
+          {
+            "effective": "2026-01-01",
+            "bank_rate_bps": 600,
+            "source": "Synthetic rate schedule A"
+          },
+          {
+            "effective": "2026-12-01",
+            "bank_rate_bps": 550,
+            "source": "Synthetic rate schedule B"
+          }
+        ]
+      }
+    },
+    {
+      "creditor": "Meridian Systems Pvt Ltd",
+      "buyer": "Kaveri Machine Works",
+      "gstin": "27ABCDE1234F1Z9",
+      "master_gstin": "27ABCDE1234F1Z9",
+      "master_name": "Kaveri Machine Works",
+      "invoice": "PP-1048",
+      "issued": "2026-08-25",
+      "due": "2026-10-24",
+      "as_of": "2026-12-15",
+      "dispute": "non_receipt",
+      "dispute_text": "Please confirm whether both pump units arrived.",
+      "lines": [
+        {
+          "id": "L1",
+          "description": "Industrial pump assemblies",
+          "kind": "goods",
+          "quantity": 2,
+          "principal": 15000000,
+          "gst": 2700000,
+          "clause": "PO-717 §4 · delivery of two units",
+          "split": {
+            "cgst": 1350000,
+            "sgst": 1350000,
+            "igst": 0
+          }
+        }
+      ],
+      "evidence": [],
+      "ledger": [],
+      "supplier_gstin": "27FGHIJ4321K1Z0",
+      "statement_row": null,
+      "terms": {
+        "basis": "msmed",
+        "authority_ref": "DEMO eligibility memo M-17 / signed payment terms",
+        "supplier_class": "small",
+        "acceptance": "2026-08-27",
+        "written_agreement": true,
+        "rates": [
+          {
+            "effective": "2026-01-01",
+            "bank_rate_bps": 600,
+            "source": "Synthetic rate schedule A"
+          },
+          {
+            "effective": "2026-12-01",
+            "bank_rate_bps": 550,
+            "source": "Synthetic rate schedule B"
+          }
+        ]
+      }
+    }
+  ],
+  "payments": [
+    {
+      "reference": "BANK-14",
+      "buyer_gstin": "27ABCDE1234F1Z9",
+      "creditor": "Meridian Systems Pvt Ltd",
+      "date": "2026-12-10",
+      "received": 1100000,
+      "allocations": [
+        {
+          "invoice": "PP-1047",
+          "amount": 700000
+        },
+        {
+          "invoice": "PP-1048",
+          "amount": 300000
+        }
+      ]
+    }
+  ]
+}

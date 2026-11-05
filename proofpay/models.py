@@ -1,5 +1,6 @@
 """Input contract. All values represent one invoice snapshot in INR paise."""
 from datetime import date
+from engine.policy import ContactPolicy, TaxSplit, Terms
 from typing import Annotated, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -20,6 +21,7 @@ class Line(Record):
     quantity: Quantity
     principal: Amount
     gst: Amount
+    split: TaxSplit | None = None
     clause: Text
     uptime_target_bps: Bps | None = None
 
@@ -35,7 +37,7 @@ class Evidence(Record):
     id: Text
     invoice: Text
     line: Text
-    kind: Literal["POD", "BOL", "acceptance", "telemetry"]
+    kind: Literal["POD", "BOL", "acceptance", "telemetry", "eway"]
     timestamp: AwareDatetime
     source: Text
     reviewer: Text
@@ -52,6 +54,7 @@ class Entry(Record):
     date: date
     base: Amount
     gst: Amount
+    split: TaxSplit | None = None
     approved: bool
 
 
@@ -63,9 +66,12 @@ class StatementRow(Record):
     issued: date
     principal: Amount
     gst: Amount
+    split: TaxSplit | None = None
 
 
 class Case(Record):
+    contact: ContactPolicy = Field(default_factory=ContactPolicy)
+    terms: Terms | None = None
     supplier_gstin: Text | None = None
     statement_row: StatementRow | None = None
     invoice: Text
@@ -88,6 +94,11 @@ class Case(Record):
     def check_snapshot(self):
         if min(self.as_of, self.due) < self.issued:
             raise ValueError("Snapshot and due date must be on or after issue.")
+        for entry in [*self.lines, *self.ledger, *([self.statement_row] if self.statement_row else [])]:
+            if entry.split and entry.split.total() != entry.gst:
+                raise ValueError("GST components must sum to the posted GST.")
+        if self.terms and self.terms.acceptance and self.terms.acceptance > self.as_of:
+            raise ValueError("Acceptance cannot be in the future.")
         for records in [self.lines, self.evidence, self.ledger]:
             if len({r.id for r in records}) != len(records):
                 raise ValueError("Duplicate IDs within a record collection.")

@@ -24,17 +24,61 @@ python -m pip install -r requirements.txt
 python -m proofpay
 ```
 
-Open **http://127.0.0.1:8765**. Five synthetic cases load on first launch. The default demo runs without a model download, API key or account. Press Ctrl+C to stop. Use `--port` or `--db` to change the port or database.
+Open **http://127.0.0.1:8765**. Six synthetic cases load on first launch. The default demo runs without a model download, API key or account. Press Ctrl+C to stop. Use `--port` or `--db` to change the port or database.
 
 ### Recruiter walkthrough
 
 1. Open **PP-1042 / Kaveri Machine Works**. The buyer asks whether both pumps arrived. Compare the PO clause, two units ordered, signed POD, receiving supervisor and timestamp. The supplied GSTR-2B row also matches the original invoice.
 2. Read the matrix. ₹1,50,000 principal + ₹27,000 GST − ₹40,000 received − ₹5,900 credit = **₹1,31,100 outstanding**. At 41 DPD the proposed letter cites POD-817 and requests a response by 7 November 2026.
 3. Open **PP-1043 / Nilgiri Components**. The receipt covers one of two units. A missing unit blocks the whole-invoice draft. **PP-1046 / Malabar Cloud Services** shows a different failure mode: measured uptime exceeds the target, yet the specific complaint still needs investigation.
-4. Compare **PP-1044** (manager review after 60 days) and **PP-1045** (early reminder). Select **Ask RAV-AI**, review an eligible draft, then export the case packet as JSON. Reopen the workbench to see the saved review.
+4. Compare **PP-1044** (manager review after 45 days) and **PP-1045** (early reminder). Select **Ask RAV-AI**, review an eligible draft, then export the case packet as JSON. Reopen the workbench to see the saved review.
 5. To demonstrate a revision, copy PP-1042 from the examples folder, change the statement row’s GST by one paisa and import the edited file. Confirm the revision. The case moves to review hold, the old approval no longer applies, and the portfolio still counts that invoice once.
 
-The examples use a fixed assessment date, **5 November 2026**, so the same input gives the same answer during an interview.
+Each example uses a fixed assessment date so the same input gives the same answer during an interview.
+
+## Featured case · MSE delayed payment
+
+Open **PP-1047** and expand **Tax split and interest audit**. The reviewed acceptance date is 27 August. The written due date is 24 October, but the 45-day ceiling moves the effective due date to **11 October**. On the 15 December snapshot, the invoice is **65 days past due**. The case holds **₹1,31,100** in open receivables and a separate **₹4,784.28** interest estimate. Expand the table to see how a ₹40,000 payment and a change in the illustrative bank rate affect different periods. Download the review PDF or inspect the opt-in WhatsApp draft.
+
+**What the legal clock measures.** For a confirmed eligible micro or small supplier, the engine uses a reviewer-confirmed acceptance or deemed-acceptance date. With a written agreement, it takes the earlier of the agreed date and acceptance plus 45 days. Without a written agreement it uses acceptance plus 15 days, with interest starting the following day. A timely written objection can affect the acceptance date; a reviewer must resolve that before supplying the date. The 46-DPD escalation is an internal routing policy. A reference to the MSE Facilitation Council requires a separate decision. [MSMED Act, sections 2(b), 15, 16 and 18](https://upload.indiacode.nic.in/showfile?actid=AC_CEN_46_77_00002_200627_1517807324919&filename=msmed_act%2C_2006_scan.pdf&type=notification)
+
+**Interest method.** All posted money uses integer paise. Estimation uses decimal arithmetic on the reviewed open gross amount, Actual/365, beginning-of-day postings and calendar-month-end rests. For MSE estimates the multiplier is three times the effective-dated bank rate; contract estimates use the reviewed annual rate and simple interest. The final estimate rounds half-up to paise. These day-count, payment-allocation and rest conventions require verification against the agreement and any adjudicated computation. The example rates are synthetic. The operator must supply a complete rate history with source references. Missing start coverage blocks escalation. The engine assumes the last supplied rate continues until superseded. Interest payments and adjudicated awards need separate reconciliation.
+
+**Tax reconciliation.** CGST, SGST and IGST are stored separately on invoice lines and approved notes. Unspecified legacy splits remain visible as unallocated. A normalized recipient GSTR-2B export can refresh an entire scoped batch; matching checks both GSTINs, invoice ID, date, taxable value and tax components. Duplicate candidate rows halt the batch for amendment review. An absent row clears the prior match for that invoice. GSTR-2B is an auto-drafted statement; the tax team decides ITC treatment. [GST Portal GSTR-2B FAQ](https://tutorial.gst.gov.in/userguide/returns/FAQ_gstr2b.htm)
+
+### Reproduce the adapters
+
+```sh
+python -m proofpay --analyze examples/PP-1047.json
+python -m proofpay --batch tests/data/portfolio.json --statement tests/data/statement.csv
+python -m proofpay --parse-proof tests/data/receipt.txt
+python -m proofpay --profile tests/data/profile.json
+```
+
+- **Portfolio reconciliation** allocates one bank receipt across two invoices, retains unapplied cash and returns revised, importable sources. Only explicit allocations are used. The CLI is a simulation; `POST /api/portfolio` commits the same operation in SQLite.
+- **Proof extraction** recognizes labeled lines in fulfillment text, preserves invoice/line references and normalizes timestamps. A signed receipt can support delivery; an e-way record alone supports transit. Parser results enter review as unverified candidates. OCR and signature authentication require additional integrations.
+- **Compact profile intake** supports the rupee-denominated sample payload. Its reported balance is ₹1,67,000. Its missing due date, approved postings and line links produce an intake hold. Use the full case schema to enable drafting.
+- **Channel control** withholds drafts if contact is paused. WhatsApp requires explicit opt-in. Email follows the account preference. The packet carries the operator's daytime IST contact window for downstream review. All delivery, filing and external reporting remain manual.
+
+### Deterministic output contract
+
+| Section | Contents |
+| --- | --- |
+| `LEDGER_SUMMARY` | Adjusted tax components, approved debits/credits, cash, open balance, payment history, DPD, effective deadline and a separate interest schedule |
+| `CAUSAL_ANCHOR` | Line IDs, clauses, cited records, signatories, timestamps and evidence gaps |
+| `TRANSACTION_STRATEGY` | Selected tier, required action and hold reasons |
+| `COMMUNICATIONS_DRAFT` | Channel-specific text, PDF availability, review status and configured contact window |
+
+```mermaid
+flowchart TD
+    Bank["Shared bank receipt"] --> Scope["Validate buyer and invoice allocations"]
+    Statement["Normalized GSTR-2B export"] --> Match["Match scoped invoice rows"]
+    Scope --> Lock{"Current invoice versions?"}
+    Match --> Lock
+    Lock -->|Yes| Store["Commit cash, history and revised snapshots"]
+    Lock -->|No| Reject["Reject stale batch"]
+    Store --> Policy["Recompute balances, estimates and draft eligibility"]
+```
 
 ## Architecture
 
@@ -65,8 +109,8 @@ flowchart TD
     Gates -->|No| Age{"Days past due"}
     Age -->|0| Current["Monitor"]
     Age -->|1 to 30| Early["Collaborative reminder"]
-    Age -->|31 to 60| Mid["Evidence-backed response request"]
-    Age -->|Over 60| Late["Manager review"]
+    Age -->|31 to 45| Mid["Evidence-backed response request"]
+    Age -->|Over 45| Late["Manager or MSE legal review"]
     Early --> Review["Human draft review"]
     Mid --> Review
 ```
@@ -81,15 +125,17 @@ flowchart TD
 | Services | Signed acceptance plus period-matched telemetry where the contract specifies an uptime target. Metrics use basis points. Conflicting below-target telemetry triggers review. | Reviewer attests contract-period coverage. A performance objection remains open until resolved. |
 | GST | Checks GSTIN shape and exact buyer-name/ID match against an imported master. An optional original-invoice GSTR-2B snapshot is checked against supplier, recipient, invoice ID, date, principal and GST. | Master and statement are offline snapshots. An absent statement is displayed as unavailable. This is neither live GSTN verification nor a filing-status determination. |
 | ITC | A separate invoice-age clock flags outstanding non-reverse-charge invoices at 180 days for tax review. | The reviewer must assess applicability, ITC actually availed, partial payment and exceptions. No automatic penalty or reversal amount. |
-| Outreach | 1–30 DPD gets a seven-day response request. 31–60 DPD gets a two-calendar-day response request. Later cases require a manager. | All correspondence is draft-only. No automatic messaging, suspension, legal referral or bureau reporting. |
+| Outreach | 1–30 DPD gets a seven-day response request. 31–45 DPD gets a two-calendar-day response request. Later cases require a manager. | All correspondence is draft-only. No automatic messaging, suspension, legal referral or bureau reporting. |
 
 **Policy source:** [Central Goods and Services Tax Act, sections 16 and 34 (India Code)](https://www.indiacode.nic.in/indiacode/bitstream/123456789/15689/1/A2017-12.pdf). The demo is scoped to Indian B2B receivables and does not implement US collection or telemarketing compliance.
 
 ## RAV-AI and payment instructions
 
+For opt-in hosted inference, set `PROOFPAY_PROVIDER=openai`, `PROOFPAY_MODEL` to an available Chat Completions model supporting JSON and temperature, and `ENGINE_API_KEY` in the server environment. This sends the objection and selected read-only accounting views to OpenAI. Keep credentials outside the repository. The adapter constrains responses to the same tool/action vocabulary used locally. Both providers request temperature 0.15. [OpenAI API reference](https://platform.openai.com/docs/api-reference/chat/create)
+
 In default **policy** mode, the next-task suggestion is deterministic. To exercise the language-model path, run Ollama locally with an installed chat model. Set `PROOFPAY_MODEL` to its exact installed name before starting ProofPay. For example, in Windows CMD use `set PROOFPAY_MODEL=your-installed-model-name`. On Linux/macOS use `export PROOFPAY_MODEL=your-installed-model-name`.
 
-The adapter sends the objection and check outcomes to the [local chat endpoint](https://docs.ollama.com/api/chat). The agent chooses read-only ledger, GST or evidence inspections, receives their results and then selects an allowed review task. The UI exposes the tool trace. Repeated tools and final decisions without an inspection are rejected. Each investigation has a four-call limit. A timeout, malformed response or disallowed action returns a visible error. The model cannot set balances, approve evidence, invent deadlines or send a message. The prompt is in [SYSTEM_PROMPT.md](SYSTEM_PROMPT.md).
+In Ollama mode the adapter sends the objection and check outcomes to the [local chat endpoint](https://docs.ollama.com/api/chat). The agent chooses read-only ledger, GST or evidence inspections, receives their results and then selects an allowed review task. The UI exposes the tool trace. Repeated tools and final decisions without an inspection are rejected. Each investigation has a four-call limit. A timeout, malformed response or disallowed action returns a visible error. The model cannot set balances, approve evidence, invent deadlines or send a message. The deployed prompt is in [system_prompt.txt](system_prompt.txt).
 
 An operator can set `PROOFPAY_REMITTANCE` to a verified payment instruction before launch. The app includes that exact text in eligible drafts. Use synthetic details for demonstrations. With this setting empty, drafts refer to the parties’ previously agreed instructions. Changing draft wording changes the review key.
 
@@ -102,6 +148,10 @@ python -m unittest discover -s tests -v
 
 | Route | Purpose |
 | --- | --- |
+| POST /api/portfolio | Atomic posting. Send versions (invoice → review_key), payments and optional statement_csv. A conflict returns 409. Check unapplied_cash in the response. |
+| POST /api/profile | Triage the compact input structure with rupee-denominated fields |
+| POST /api/parse-proof | Submit a text field for candidate extraction |
+| POST /api/notice | Submit invoice and review_key to download a draft PDF |
 | GET /api/schema | JSON Schema for invoice imports |
 | GET /api/cases | Analyzed snapshots, source data and review status |
 | POST /api/cases | Validate and insert a unique invoice snapshot |
@@ -122,12 +172,14 @@ POST requests accept JSON. From the terminal, use the loopback host and port. St
 
 | Path | Responsibility |
 | --- | --- |
+| engine/ | Interest schedules, policy inputs, batch posting, tax import, proof parser, packet and PDF renderer |
+| tests/data/ | Annotated example inputs for the CLI adapters |
 | proofpay/models.py | Typed input contract and validation |
 | proofpay/engine.py | Evidence, GST, balances and strategy |
 | proofpay/agent.py | Local model adapter and policy fallback |
 | proofpay/__main__.py | CLI, HTTP API and SQLite storage |
 | proofpay/static/ | Investigator dashboard |
-| examples/ | Five synthetic invoice snapshots |
+| examples/ | Six synthetic invoice snapshots |
 | tests/test_recovery.py | Accounting, policy, API and adapter regression tests |
 | .github/workflows/checks.yml | Continuous integration |
 
@@ -135,18 +187,6 @@ POST requests accept JSON. From the terminal, use the loopback host and port. St
 
 This is a single-user, loopback-only portfolio application. Use synthetic records for demos. A real deployment would need identity and access control, credential-managed ERP and tax integrations, original evidence storage, tamper-resistant audit logging, jurisdiction-specific policy review and an authorized communications workflow. The examples demonstrate decision behavior; they provide no measured recovery-rate or cash-flow uplift.
 
-## Publish your copy on GitHub
+## Source and checks
 
-Create an empty GitHub repository called **proofpay**. Open a terminal in this project folder and run the following, replacing YOUR-USERNAME with your account name. Skip the commit if Git reports that the working tree is clean.
-
-```sh
-git init -b main
-git add .
-git commit -m "Build ProofPay receivables review workbench"
-git remote add origin https://github.com/YOUR-USERNAME/proofpay.git
-git push -u origin main
-```
-
-Suggested repository description: **Evidence-backed B2B receivables review with line-level delivery checks, GST reconciliation and a locally hosted AI review assistant.**
-
-Suggested topics: `python`, `fintech`, `accounts-receivable`, `gst`, `ollama`, `sqlite`, `ai-agent`.
+[GitHub repository](https://github.com/pushkkal0201-bit/ProofPay) · [Continuous integration](https://github.com/pushkkal0201-bit/ProofPay/actions)

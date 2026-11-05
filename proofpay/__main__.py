@@ -7,6 +7,8 @@ from pathlib import Path
 from .models import Case
 from .engine import analyze
 from .agent import suggest
+from engine.intake import VersionConflict, post_portfolio, CashReceipt, match_statement, parse_record, reconcile_batch, review_profile
+from engine.notices import render_notice
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "proofpay" / "static"
@@ -23,6 +25,7 @@ def review_key(raw, report):
 def init_db(path):
     with sqlite3.connect(path) as db:
         db.execute("CREATE TABLE IF NOT EXISTS cases (id TEXT PRIMARY KEY, data TEXT NOT NULL)")
+        db.execute("CREATE TABLE IF NOT EXISTS cash_receipts (creditor TEXT, buyer TEXT, ref TEXT, data TEXT, PRIMARY KEY(creditor,buyer,ref))")
         db.execute("CREATE TABLE IF NOT EXISTS history (id TEXT, data TEXT, archived_at TEXT DEFAULT CURRENT_TIMESTAMP)")
         db.execute("CREATE TABLE IF NOT EXISTS reviews (hash TEXT PRIMARY KEY, reviewed_at TEXT DEFAULT CURRENT_TIMESTAMP)")
         for source in sorted((ROOT / "examples").glob("*.json")):
@@ -74,7 +77,14 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < length <= 1000000:
                 return self.reply(413,{"error":"Expected 1 to 1,000,000 bytes."})
             data = json.loads(self.rfile.read(length))
+            if self.path == "/api/parse-proof":
+                return self.reply(200,parse_record(data["text"]))
+            if self.path == "/api/profile":
+                return self.reply(200,review_profile(data))
             with sqlite3.connect(self.server.database) as db:
+                if self.path == "/api/portfolio":
+                    result = post_portfolio(db, data, analyze, snapshot, review_key)
+                    return self.reply_after_commit(db,200,result)
                 if self.path == "/api/cases":
                     case = Case.model_validate(data)
                     db.execute("INSERT INTO cases VALUES (?,?)",(case.invoice,snapshot(case)))
@@ -92,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
                     db.execute("INSERT INTO history(id,data) VALUES (?,?)",(case.invoice, prior[0]))
                     db.execute("UPDATE cases SET data=? WHERE id=?", (snapshot(case),case.invoice))
                     return self.reply_after_commit(db,200,{"invoice":case.invoice})
-                if self.path not in ("/api/review","/api/agent"):
+                if self.path not in ("/api/review","/api/agent","/api/notice"):
                     return self.reply(404,{"error":"Unknown route"})
                 if self.path == "/api/review":
                     db.execute("BEGIN IMMEDIATE")
@@ -101,19 +111,25 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(404,{"error":"Unknown invoice"})
                 case = Case.model_validate_json(row[0])
                 report = analyze(case)
+                if self.path == "/api/notice":
+                    if data["review_key"] != review_key(row[0],report) or not report["draft"]:
+                        return self.reply(409,{"error":"A current eligible draft is required."})
+                    return self.reply(200,render_notice(report),"application/pdf")
                 if self.path == "/api/agent":
                     try:
                         return self.reply(200,suggest(case,report))
-                    except (OSError,ValueError,TypeError,KeyError):
-                        return self.reply(503,{"error":"Local model unavailable or invalid response. Case unchanged."})
+                    except (OSError,ValueError,TypeError,KeyError,IndexError):
+                        return self.reply(503,{"error":"Inference provider unavailable or invalid response. Case unchanged."})
                 key = review_key(row[0],report)
                 if not report["draft"] or data["review_key"] != key:
                     return self.reply(409,{"error":"Review requires a current eligible draft."})
                 db.execute("INSERT OR IGNORE INTO reviews(hash) VALUES (?)",(key,))
                 return self.reply_after_commit(db,200,{"reviewed":True})
+        except VersionConflict as err:
+            self.reply(409,{"error":str(err)})
         except sqlite3.IntegrityError:
             self.reply(409,{"error":"Invoice already exists. Use the revision workflow."})
-        except (KeyError,ValueError,TypeError,sqlite3.InterfaceError,sqlite3.ProgrammingError) as err:
+        except (ArithmeticError,KeyError,ValueError,TypeError,sqlite3.InterfaceError,sqlite3.ProgrammingError) as err:
             self.reply(400,{"error":str(err)[:1200]})
 
     def reply_after_commit(self, db, status, value):
@@ -126,7 +142,29 @@ def main():
     parser.add_argument("--port",type=int,default=8765)
     parser.add_argument("--db",default="proofpay.sqlite3")
     parser.add_argument("--analyze",type=Path)
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--profile",type=Path,help="Triage a compact rupee-denominated profile")
+    mode.add_argument("--parse-proof",type=Path,help="Extract candidates from labeled fulfillment text")
+    mode.add_argument("--batch",type=Path,help="Reconcile an invoice portfolio and shared cash receipts")
+    parser.add_argument("--statement",type=Path,help="Normalized GSTR-2B CSV for the batch scope")
     args = parser.parse_args()
+    if args.statement and not args.batch:
+        parser.error("--statement requires --batch")
+    if args.parse_proof:
+        print(json.dumps(parse_record(args.parse_proof.read_text(encoding="utf-8")),indent=2))
+        return
+    if args.profile:
+        print(json.dumps(review_profile(json.loads(args.profile.read_bytes())),indent=2))
+        return
+    if args.batch:
+        data = json.loads(args.batch.read_bytes())
+        cases, unmatched = reconcile_batch([Case.model_validate(c) for c in data["cases"]],
+                                           [CashReceipt.model_validate(r) for r in data.get("payments",[])])
+        if args.statement:
+            cases = match_statement(cases,args.statement.read_text(encoding="utf-8-sig"))
+        print(json.dumps(dict(reports=[analyze(c) for c in cases],sources=[c.model_dump(mode="json") for c in cases],
+                              unapplied_cash=unmatched),indent=2))
+        return
     if args.analyze:
         print(json.dumps(analyze(Case.model_validate_json(args.analyze.read_bytes())),indent=2))
         return

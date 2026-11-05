@@ -32,8 +32,8 @@ class EngineTests(unittest.TestCase):
         self.assertIn('2026-11-07',r['draft'])
 
     def test_age_boundaries(self):
-        for dpd, bucket in [(0,'Current'),(1,'1–30'),(30,'1–30'),(31,'31–60'),
-                            (60,'31–60'),(61,'61–90'),(90,'61–90'),(91,'91+')]:
+        for dpd, bucket in [(0,'Current'),(1,'1–30'),(30,'1–30'),(31,'31–45'),(45,'31–45'),(46,'46–90'),
+                            (60,'46–90'),(61,'46–90'),(90,'46–90'),(91,'91+')]:
             with self.subTest(dpd=dpd):
                 self.c.due=self.c.as_of-timedelta(days=dpd)
                 self.assertEqual(analyze(self.c)['bucket'],bucket)
@@ -125,7 +125,7 @@ class ApiTests(unittest.TestCase):
                     for route in ['/','/style.css','/app.js','/api/schema']:
                         with urlopen(base+route) as r:self.assertEqual(r.status,200)
                     with urlopen(base+'/api/cases') as r: cases=json.load(r)
-                    self.assertEqual(len(cases),5)
+                    self.assertEqual(len(cases),6)
                     r=cases[0]; payload=dict(invoice=r['invoice'],review_key=r['review_key'])
                     self.assertTrue(post('/api/review',payload)['reviewed'])
                     self.assertTrue(post('/api/review',payload)['reviewed'])

@@ -1,4 +1,4 @@
-"""Bounded, read-only investigation using a local Ollama model."""
+"""Bounded, read-only investigation with explicit provider selection."""
 import json
 import os
 from pathlib import Path
@@ -13,12 +13,27 @@ TASKS = {
 
 
 def ask_model(model, messages):
-    payload = dict(model=model, stream=False, format="json", options={"temperature": 0},
-                   messages=messages)
-    req = Request("http://127.0.0.1:11434/api/chat", data=json.dumps(payload).encode(),
-                  headers={"Content-Type": "application/json"})
+    provider = os.environ.get("PROOFPAY_PROVIDER", "ollama")
+    headers = {"Content-Type": "application/json"}
+    if provider == "openai":
+        key = os.environ.get("ENGINE_API_KEY")
+        if not key:
+            raise ValueError("Missing API credential.")
+        endpoint = "https://api.openai.com/v1/chat/completions"
+        headers["Authorization"] = "Bearer " + key
+        payload = dict(model=model, messages=messages, temperature=0.15,
+                       response_format={"type":"json_object"}, store=False)
+    elif provider == "ollama":
+        endpoint = "http://127.0.0.1:11434/api/chat"
+        payload = dict(model=model, messages=messages, stream=False, format="json",
+                       options={"temperature":0.15})
+    else:
+        raise ValueError("Unknown inference provider.")
+    req = Request(endpoint, data=json.dumps(payload).encode(), headers=headers)
     with urlopen(req, timeout=25) as res:
-        return json.loads(json.loads(res.read(262144))["message"]["content"])
+        body = json.loads(res.read(262144))
+    message = body["choices"][0]["message"] if provider == "openai" else body["message"]
+    return json.loads(message["content"])
 
 
 def suggest(case, report):
@@ -38,13 +53,13 @@ def suggest(case, report):
         return dict(mode="policy", task=TASKS[choice], trace=["recovery_policy"])
 
     views = {
-        "read_ledger": dict(matrix=report["matrix"], balance=report["balance"]),
+        "read_ledger": report["LEDGER_SUMMARY"],
         "read_evidence": [dict(line=p["line"], clause=p["clause"], gaps=p["gaps"],
                                references=[e["id"] for e in p["anchors"]]) for p in report["proof"]],
         "read_gst": dict(master_match=report["master_match"], statement=report["statement"],
-                         itc_review=report["itc_review"]),
+                         itc_review=report["itc_review"], adjusted_split=report["LEDGER_SUMMARY"]["adjusted_tax_split"]),
     }
-    system = (Path(__file__).resolve().parents[1] / "SYSTEM_PROMPT.md").read_text(encoding="utf-8")
+    system = (Path(__file__).resolve().parents[1] / "system_prompt.txt").read_text(encoding="utf-8")
     facts = dict(state=report["state"], reasons=report["reasons"], objection=case.dispute_text,
                  allowed_tasks=options, tools=list(views))
     messages = [{"role":"system","content":system}, {"role":"user","content":json.dumps(facts)}]

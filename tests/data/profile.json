@@ -1,0 +1,20 @@
+{
+  "creditor_identity": "TechLogix Solutions",
+  "debtor_identity": "Enterprise Infra Corp",
+  "debtor_gstin": "09AAAAA1111A1Z1",
+  "msme_registered": true,
+  "financial_ledger": {
+    "invoice_id": "TL-2026-402",
+    "invoice_date": "2026-09-15",
+    "base_value": 150000,
+    "gst_value": 27000,
+    "credits_applied": 10000
+  },
+  "execution_metrics": {
+    "proof_type": "e-Way Bill Transit & Signed Material Receipt",
+    "tracking_reference": "EWAY-884102-2026",
+    "delivery_timestamp": "2026-09-17 11:30:00 IST",
+    "signatory_agent": "A. K. Sharma (Operations)"
+  },
+  "current_debtor_status": "Internal audit delay"
+}
