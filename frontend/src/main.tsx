@@ -14,16 +14,24 @@ const modes: { id: View; name: string; title: string }[] = [
   { id: "msme", name: "Statutory monitor", title: "MSME statutory monitor" },
   { id: "comms", name: "Dispatch", title: "Resolution & dispatch" },
 ];
+function workspaceFromUrl(): View {
+  return modes.find(mode => mode.id === window.location.hash.slice(1))?.id ?? "chain";
+}
 function App() {
   const [data, load] = useState<Invoice[]>([]),
     [selected, select] = useState("PP-1047"),
-    [view, setView] = useState<View>("chain"),
+    [view, setView] = useState<View>(workspaceFromUrl),
     [search, filter] = useState(""),
     [message, notify] = useState(""),
     [loading, wait] = useState(true);
   const [scope, setScope] = useState("All invoices");
   const input = useRef<HTMLInputElement>(null),
     upload = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const sync = () => setView(workspaceFromUrl());
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
   const refresh = useCallback(async () => {
     const result: Invoice[] = await (await request("cases")).json();
     load(result);
@@ -62,7 +70,7 @@ function App() {
       const m = modes.find((_, i) => String(i + 1) === e.key);
       if (m) {
         e.preventDefault();
-        setView(m.id);
+        window.location.hash = m.id;
         return;
       }
       if (!current) return;
@@ -119,10 +127,10 @@ function App() {
   return (
     <>
       <header className="mast">
-        <div className="brand">
+        <a className="brand" href="/" aria-label="ProofPay home">
           <Glyph type="brand" />
           ProofPay
-        </div>
+        </a>
         <span className="mast-divider">/</span>
         <span className="mast-text">Receivables operations</span>
         <div className="ml-auto flex items-center gap-3">
@@ -135,7 +143,7 @@ function App() {
           <button
             key={m.id}
             aria-current={view === m.id ? "page" : undefined}
-            onClick={() => setView(m.id)}
+            onClick={() => window.location.hash = m.id}
           >
             {m.name}
             <kbd>{i + 1}</kbd>

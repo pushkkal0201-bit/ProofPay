@@ -5,8 +5,10 @@ if not exist ".venv\Scripts\python.exe" (
     py -3.11 -m venv .venv || goto failed
 )
 ".venv\Scripts\python.exe" -m pip install -r requirements.txt || goto failed
-echo Open http://127.0.0.1:8765 in your browser once the server is ready.
-".venv\Scripts\python.exe" -m proofpay || goto failed
+set "PORT=8765"
+if not "%~1"=="" set "PORT=%~1"
+echo Open http://127.0.0.1:%PORT%/datum once the server is ready.
+".venv\Scripts\python.exe" -m proofpay --port "%PORT%" || goto failed
 exit /b 0
 :failed
 echo Setup stopped. Review the error above.

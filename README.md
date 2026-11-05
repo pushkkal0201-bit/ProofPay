@@ -10,7 +10,7 @@ The [FastAPI backend guide](BACKEND.md) includes Windows setup, an executable in
 
 ## Try it in two minutes
 
-On Windows with Python 3.11 installed, extract the full ZIP and double-click **Start-ProofPay.cmd**. Open http://127.0.0.1:8765 once the server is ready. The local workbench uses the Datum Office paper-and-ink theme with its bundled Space Grotesk heading font.
+On Windows with Python 3.11 installed, extract the full ZIP and double-click **Start-ProofPay.cmd**. Open http://127.0.0.1:8765 once the server is ready. The opening page reads **Trace the balance.** Open **Audit ledger** to review invoices, or choose any of the four workspaces. The local workbench uses the Datum Office paper-and-ink theme with its bundled Space Grotesk heading font.
 
 Extract the repository and open a terminal in the directory containing this README. On Windows Command Prompt:
 
