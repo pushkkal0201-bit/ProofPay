@@ -1,4 +1,8 @@
 """Input contract. All values represent one invoice snapshot in INR paise."""
+import base64
+import hashlib
+from io import BytesIO
+from PIL import Image, UnidentifiedImageError
 from datetime import date
 from engine.policy import ContactPolicy, TaxSplit, Terms
 from typing import Annotated, Literal
@@ -32,7 +36,29 @@ class Attachment(Record):
     sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
 
 
+class Crop(Record):
+    png_base64: Annotated[str, Field(min_length=1,max_length=240000)]
+    sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+    ocr_text: Annotated[str, Field(max_length=18000)]
+    origin: Text
+
+    @model_validator(mode="after")
+    def check_image(self):
+        raw = base64.b64decode(self.png_base64,validate=True)
+        if hashlib.sha256(raw).hexdigest() != self.sha256:
+            raise ValueError("Signed-note crop checksum mismatch.")
+        try:
+            with Image.open(BytesIO(raw)) as image:
+                if image.format != "PNG" or image.width * image.height > 4000000:
+                    raise ValueError("Attach a PNG crop of up to four megapixels.")
+                image.verify()
+        except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as err:
+            raise ValueError("Invalid crop image.") from err
+        return self
+
+
 class Evidence(Record):
+    crop: Crop | None = None
     attachment: Attachment | None = None
     id: Text
     invoice: Text

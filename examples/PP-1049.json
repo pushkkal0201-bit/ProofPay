@@ -1,0 +1,70 @@
+{
+  "creditor": "Meridian Systems Pvt Ltd",
+  "buyer": "Aranya Bearings",
+  "gstin": "27ABCDE1234F1Z9",
+  "master_gstin": "27ABCDE1234F1Z9",
+  "master_name": "Aranya Bearings",
+  "invoice": "PP-1049",
+  "issued": "2026-04-10",
+  "due": "2026-05-10",
+  "as_of": "2026-11-05",
+  "dispute": "none",
+  "dispute_text": null,
+  "lines": [
+    {
+      "id": "L1",
+      "description": "Bearing housings",
+      "kind": "goods",
+      "quantity": 2,
+      "principal": 1200000,
+      "gst": 216000,
+      "clause": "PO-221 §2 · two bearing housings",
+      "split": {
+        "cgst": 0,
+        "sgst": 0,
+        "igst": 216000
+      }
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EWB-402219",
+      "invoice": "PP-1049",
+      "line": "L1",
+      "kind": "eway",
+      "timestamp": "2026-04-10T11:30:00+05:30",
+      "source": "Synthetic transit log",
+      "reviewer": "Demo controller",
+      "verified": true
+    }
+  ],
+  "ledger": [
+    {
+      "id": "DN-49",
+      "kind": "debit",
+      "date": "2026-05-07",
+      "base": 50000,
+      "gst": 9000,
+      "split": {
+        "cgst": 0,
+        "sgst": 0,
+        "igst": 9000
+      },
+      "approved": true
+    }
+  ],
+  "supplier_gstin": "29FGHIJ4321K1Z0",
+  "statement_row": {
+    "invoice": "PP-1049",
+    "recipient_gstin": "27ABCDE1234F1Z9",
+    "supplier_gstin": "29FGHIJ4321K1Z0",
+    "issued": "2026-04-10",
+    "principal": 1200000,
+    "gst": 216000,
+    "split": {
+      "cgst": 108000,
+      "sgst": 108000,
+      "igst": 0
+    }
+  }
+}

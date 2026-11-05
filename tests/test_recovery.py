@@ -125,7 +125,7 @@ class ApiTests(unittest.TestCase):
                     for route in ['/','/style.css','/app.js','/api/schema']:
                         with urlopen(base+route) as r:self.assertEqual(r.status,200)
                     with urlopen(base+'/api/cases') as r: cases=json.load(r)
-                    self.assertEqual(len(cases),6)
+                    self.assertEqual(len(cases),7)
                     r=cases[0]; payload=dict(invoice=r['invoice'],review_key=r['review_key'])
                     self.assertTrue(post('/api/review',payload)['reviewed'])
                     self.assertTrue(post('/api/review',payload)['reviewed'])

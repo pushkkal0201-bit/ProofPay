@@ -9,6 +9,7 @@ from .engine import analyze
 from .agent import suggest
 from engine.intake import VersionConflict, post_portfolio, CashReceipt, match_statement, parse_record, reconcile_batch, review_profile
 from engine.notices import render_notice
+from engine.workbench import Projection, Handoff, project, handoff
 
 ROOT = Path(__file__).resolve().parents[1]
 STATIC = ROOT / "proofpay" / "static"
@@ -102,7 +103,7 @@ class Handler(BaseHTTPRequestHandler):
                     db.execute("INSERT INTO history(id,data) VALUES (?,?)",(case.invoice, prior[0]))
                     db.execute("UPDATE cases SET data=? WHERE id=?", (snapshot(case),case.invoice))
                     return self.reply_after_commit(db,200,{"invoice":case.invoice})
-                if self.path not in ("/api/review","/api/agent","/api/notice"):
+                if self.path not in ("/api/review","/api/agent","/api/notice","/api/projection","/api/handoff"):
                     return self.reply(404,{"error":"Unknown route"})
                 if self.path == "/api/review":
                     db.execute("BEGIN IMMEDIATE")
@@ -111,6 +112,15 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(404,{"error":"Unknown invoice"})
                 case = Case.model_validate_json(row[0])
                 report = analyze(case)
+                if self.path in ("/api/projection","/api/handoff"):
+                    if data.get("review_key") != review_key(row[0],report):
+                        return self.reply(409,{"error":"Snapshot changed. Reload before continuing."})
+                    if self.path == "/api/projection":
+                        return self.reply(200,project(case,Projection.model_validate(data)))
+                    payload,mime = handoff(report,Handoff.model_validate(data))
+                    if mime == "application/json":
+                        return self.reply(200,json.loads(payload))
+                    return self.reply(200,payload,mime)
                 if self.path == "/api/notice":
                     if data["review_key"] != review_key(row[0],report) or not report["draft"]:
                         return self.reply(409,{"error":"A current eligible draft is required."})

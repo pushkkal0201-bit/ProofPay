@@ -2,7 +2,7 @@
 
 **An evidence-first B2B receivables workbench for Indian invoices.** ProofPay reconciles an invoice, checks whether delivery or service records support its individual lines, and prepares a collection draft when those checks pass. RAV-AI suggests the next review task. A person decides what to send.
 
-**Stack** · Python 3.11+ · Pydantic v2 · SQLite · vanilla JavaScript · optional local Ollama · GitHub Actions
+**Stack** · Python 3.11+ · Pydantic v2 · SQLite · React 18 · strict TypeScript · Tailwind CSS · optional local Ollama · GitHub Actions
 
 ## Try it in two minutes
 
@@ -24,7 +24,7 @@ python -m pip install -r requirements.txt
 python -m proofpay
 ```
 
-Open **http://127.0.0.1:8765**. Six synthetic cases load on first launch. The default demo runs without a model download, API key or account. Press Ctrl+C to stop. Use `--port` or `--db` to change the port or database.
+Open **http://127.0.0.1:8765**. Seven synthetic cases load on first launch. The default demo runs without a model download, API key or account. Press Ctrl+C to stop. Use `--port` or `--db` to change the port or database.
 
 ### Recruiter walkthrough
 
@@ -35,6 +35,27 @@ Open **http://127.0.0.1:8765**. Six synthetic cases load on first launch. The de
 5. To demonstrate a revision, copy PP-1042 from the examples folder, change the statement row’s GST by one paisa and import the edited file. Confirm the revision. The case moves to review hold, the old approval no longer applies, and the portfolio still counts that invoice once.
 
 Each example uses a fixed assessment date so the same input gives the same answer during an interview.
+
+## The reviewer workbench
+
+The Python server serves a prebuilt React client. The four workspaces share the active invoice. Press **1–4** to switch screens, **J/K** or **↓/↑** to move across filtered invoices and **/** to search. Shortcuts suspend while typing. Use Tab and Enter to expand invoice rows and inspect attachments.
+
+| Screen | Inspect or act |
+| --- | --- |
+| Causal chain | Expand invoice lines or open the execution pane. Compare signatories, e-way records and uptime; inspect stored verification JSON, source hashes, signed-note crops and OCR text. PP-1047 includes a labeled synthetic scan and its actual OCR transcription. |
+| Tax ledger | Expand original lines and approved/pending postings. PP-1049 has a debit note, an overdue payment-age review flag and a statement tax-component mismatch despite matching gross GST. |
+| Statutory monitor | Compare acceptance, agreed due date and effective due date. Change the assumed future bank rate and scrub or play the 30-day estimate. Historical rates and the posted ledger stay authoritative. Playback advances one scenario day per second. |
+| Communications | Compare the engine payload with a manually edited channel draft. Edits persist within the browser session by snapshot and channel. Export the edited PDF, an unsent email file or a WhatsApp JSON body to complete in an authorized client. Every export rechecks channel eligibility and snapshot identity. |
+
+To rebuild the committed assets with Node 22+:
+
+```sh
+cd frontend
+npm ci
+npm run build
+```
+
+The source is in [frontend/src](frontend/src). A normal Python launch uses the compiled bundle without a Node runtime or CDN connection. Existing databases keep previous case versions. To see the bundled signed crop on an older installation, import the updated [PP-1047 snapshot](examples/PP-1047.json) or launch with a fresh demo database.
 
 ## Featured case · MSE delayed payment
 
@@ -179,7 +200,7 @@ POST requests accept JSON. From the terminal, use the loopback host and port. St
 | proofpay/agent.py | Local model adapter and policy fallback |
 | proofpay/__main__.py | CLI, HTTP API and SQLite storage |
 | proofpay/static/ | Investigator dashboard |
-| examples/ | Six synthetic invoice snapshots |
+| examples/ | Seven synthetic invoice snapshots |
 | tests/test_recovery.py | Accounting, policy, API and adapter regression tests |
 | .github/workflows/checks.yml | Continuous integration |
 
