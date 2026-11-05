@@ -17,6 +17,7 @@ export function liability(c: Invoice) {
     age,
     beyondCeiling: age > 45,
     interest: estimate.amount,
+    rateSource: applicable?.source,
     rate: applicable ? (applicable.bank_rate_bps * 3) / 100 : null,
   };
 }

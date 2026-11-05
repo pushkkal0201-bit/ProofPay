@@ -23,11 +23,12 @@ function TaxCell({ c }: { c: Invoice }) {
   );
 }
 export function Chain({ rows, current, choose, refresh, notify }: Props) {
-  const [shown, show] = useState(true),
+  const [closedInvoice, closeInvoice] = useState<string | null>(null),
     [expanded, expand] = useState<string[]>([]);
+  const shown = Boolean(current && closedInvoice !== current.invoice);
   function select(c: Invoice) {
     choose(c);
-    show(true);
+    closeInvoice(null);
   }
   return (
     <div className={shown && current ? "split audit-split" : "block"}>
@@ -49,7 +50,7 @@ export function Chain({ rows, current, choose, refresh, notify }: Props) {
                     "Aging (DPD)",
                     "Dispute Lock",
                   ].map((h) => (
-                    <th key={h}>{h}</th>
+                    <th key={h} scope="col">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -84,7 +85,7 @@ export function Chain({ rows, current, choose, refresh, notify }: Props) {
                             >
                               {open ? "−" : "+"}
                             </button>
-                            <button className="id" onClick={() => select(c)}>
+                            <button className="id" aria-current={current?.invoice === c.invoice ? "true" : undefined} onClick={() => select(c)}>
                               {c.invoice}
                             </button>
                           </div>
@@ -134,8 +135,7 @@ export function Chain({ rows, current, choose, refresh, notify }: Props) {
                             {penalty.rate !== null &&
                               " | " + penalty.rate.toFixed(2) + "% p.a."}
                             <small>
-                              Section 16, MSMED Act · 3× supplied RBI bank rate
-                              · monthly rests · estimate at {c.as_of}
+                              Section 16, MSMED Act · 3× RBI bank rate, compounded monthly · estimate at {c.as_of}{penalty.rateSource && " · " + penalty.rateSource}
                             </small>
                           </td>
                         </tr>
@@ -161,7 +161,7 @@ export function Chain({ rows, current, choose, refresh, notify }: Props) {
         <Inspector
           key={current.invoice}
           c={current}
-          close={() => show(false)}
+          close={() => closeInvoice(current.invoice)}
         />
       )}
     </div>
@@ -240,13 +240,16 @@ function EvidenceLine({ p }: { p: LineProof }) {
         <div key={a.id} className="anchor">
           <div className="flex items-center justify-between">
             <b>{a.id}</b>
-            <span className="micro">{a.kind}</span>
+            <span className="micro">{a.kind === "eway" ? "e-Way Bill" : a.kind}</span>
           </div>
           <dl>
             <Pair label={a.kind === "eway" ? "Transit stamp" : "Timestamp"}>
               {a.timestamp}
             </Pair>
-            <Pair label="Signatory">{a.signer ?? "—"}</Pair>
+            <Pair label="Source record">{a.source}</Pair>
+            {a.signer && <Pair label="Recipient">{a.signer}</Pair>}
+            {a.quantity !== null && <Pair label="Quantity received">{a.quantity}</Pair>}
+            {a.uptime_bps !== null && <Pair label="Measured uptime">{(a.uptime_bps / 100).toFixed(2)}%</Pair>}
             {a.signature && (
               <Pair label="Verified signature key">{a.signature.key_id}</Pair>
             )}
