@@ -1,137 +1,162 @@
 import { Fragment, useState } from "react";
-import { Badge, Pair, PanelTitle, money } from "./shared";
+import { Pair, PanelTitle, money } from "./shared";
+import { billingTax, liability } from "./ledgerPolicy";
+import { Communications } from "./Communications";
 import type { Invoice, LineProof } from "./types";
-
 type Inspect = "Evidence" | "Raw JSON" | "Tax log";
-export function Chain({
-  rows,
-  current,
-  choose,
-}: {
+interface Props {
   rows: Invoice[];
   current: Invoice | undefined;
   choose: (c: Invoice) => void;
-}) {
-  const [shown, show] = useState(true);
-  const select = (c: Invoice) => {
+  refresh: () => Promise<void>;
+  notify: (s: string) => void;
+}
+function TaxCell({ c }: { c: Invoice }) {
+  const split = billingTax(c);
+  return (
+    <>
+      <span>{money(c.matrix.gst)}</span>
+      <small>
+        {split ? split.map((n) => money(n)).join(" / ") : "Split unreported"}
+      </small>
+    </>
+  );
+}
+export function Chain({ rows, current, choose, refresh, notify }: Props) {
+  const [shown, show] = useState(true),
+    [expanded, expand] = useState<string[]>([]);
+  function select(c: Invoice) {
     choose(c);
     show(true);
-  };
-  const [expanded, expand] = useState<string[]>([]);
+  }
   return (
-    <div className={shown ? "split" : "block"}>
-      <section className="sheet">
-        <PanelTitle end={<span>{rows.length} invoices</span>}>
-          Fulfillment register
-        </PanelTitle>
-        <div className="scroll">
-          <table>
-            <thead>
-              <tr>
-                {[
-                  "Invoice ID",
-                  "e-Way bill ID",
-                  "Gateway uptime",
-                  "Verified signatory",
-                  "DPD",
-                ].map((h) => (
-                  <th key={h}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((c) => {
-                const anchors = c.proof.flatMap((p) => p.anchors);
-                const signed = anchors.find((a) => a.signer);
-                const telemetry = anchors.find((a) => a.kind === "telemetry");
-                return (
-                  <Fragment key={c.invoice}>
-                    <tr
-                      id={"row-" + c.invoice}
-                      data-invoice={c.invoice}
-                      className={
-                        current?.invoice === c.invoice ? "selected" : ""
-                      }
-                      onClick={() => select(c)}
-                    >
-                      <td>
-                        <div className="flex items-start gap-2">
-                          <button
-                            aria-label={"Expand lines for " + c.invoice}
-                            aria-expanded={expanded.includes(c.invoice)}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              expand((xs) =>
-                                xs.includes(c.invoice)
-                                  ? xs.filter((x) => x !== c.invoice)
-                                  : [...xs, c.invoice],
-                              );
-                            }}
-                          >
-                            {expanded.includes(c.invoice) ? "−" : "+"}
-                          </button>
-                          <div>
+    <div className={shown && current ? "split audit-split" : "block"}>
+      <div className="audit-left">
+        <section className="sheet">
+          <PanelTitle end={<span>{rows.length} records · INR</span>}>
+            Audit Ledger
+          </PanelTitle>
+          <div className="scroll">
+            <table className="audit-grid">
+              <thead>
+                <tr>
+                  {[
+                    "Invoice ID",
+                    "Customer Entity",
+                    "Base Amount",
+                    "Tax (CGST/SGST/IGST)",
+                    "Net Due",
+                    "Aging (DPD)",
+                    "Dispute Lock",
+                  ].map((h) => (
+                    <th key={h}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((c) => {
+                  const penalty = liability(c),
+                    open = expanded.includes(c.invoice);
+                  return (
+                    <Fragment key={c.invoice}>
+                      <tr
+                        id={"row-" + c.invoice}
+                        data-invoice={c.invoice}
+                        className={[
+                          current?.invoice === c.invoice ? "selected" : "",
+                          penalty?.beyondCeiling ? "statutory-breach" : "",
+                        ].join(" ")}
+                        onClick={() => select(c)}
+                      >
+                        <td>
+                          <div className="flex items-center gap-1">
+                            <button
+                              aria-label={"Expand lines for " + c.invoice}
+                              aria-expanded={open}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                expand((xs) =>
+                                  open
+                                    ? xs.filter((id) => id !== c.invoice)
+                                    : [...xs, c.invoice],
+                                );
+                              }}
+                            >
+                              {open ? "−" : "+"}
+                            </button>
                             <button className="id" onClick={() => select(c)}>
                               {c.invoice}
                             </button>
-                            <small>{c.buyer}</small>
                           </div>
-                        </div>
-                      </td>
-                      <td>
-                        {anchors.find((a) => a.kind === "eway")?.id ?? "—"}
-                      </td>
-                      <td>
-                        {telemetry?.uptime_bps != null
-                          ? (telemetry.uptime_bps / 100).toFixed(2) + "%"
-                          : "—"}
-                      </td>
-                      <td>{signed?.signer?.split(",")[0] ?? "—"}</td>
-                      <td className={c.dpd > 45 ? "overdue num" : "num"}>
-                        {c.dpd}
-                      </td>
-                    </tr>
-                    {expanded.includes(c.invoice) &&
-                      c.proof.map((p) => (
-                        <tr className="subrow" key={p.line}>
-                          <td colSpan={5}>
-                            ↳ {p.line} · {p.description} ·{" "}
-                            {p.gaps.length
-                              ? p.gaps.join(" ")
-                              : p.anchors.map((a) => a.id).join(" / ")}
+                        </td>
+                        <td className="buyer">{c.buyer}</td>
+                        <td className="num">{money(c.matrix.principal)}</td>
+                        <td className="num tax-cell">
+                          <TaxCell c={c} />
+                        </td>
+                        <td className="num net">{money(c.collectible)}</td>
+                        <td
+                          className={
+                            "num " + (penalty?.beyondCeiling ? "overdue" : "")
+                          }
+                        >
+                          {c.dpd}
+                        </td>
+                        <td>
+                          <span className={c.reasons.length ? "lock" : "clear"}>
+                            {c.reasons.length ? "Locked" : "Clear"}
+                          </span>
+                        </td>
+                      </tr>
+                      {open &&
+                        c.proof.map((p) => (
+                          <tr className="subrow" key={p.line}>
+                            <td colSpan={7}>
+                              ↳ {p.line} · {p.description} ·{" "}
+                              {p.gaps.join(" ") ||
+                                p.anchors.map((a) => a.id).join(" / ")}
+                            </td>
+                          </tr>
+                        ))}
+                      {penalty && (
+                        <tr
+                          className={
+                            "liability " +
+                            (penalty.beyondCeiling ? "ceiling" : "")
+                          }
+                        >
+                          <td colSpan={7}>
+                            <strong>STATUTORY OVERDUE LIAB:</strong> Day{" "}
+                            {penalty.age}/45 | Accrued Interest:{" "}
+                            {penalty.interest === null
+                              ? "Pending rate review"
+                              : money(penalty.interest)}
+                            {penalty.rate !== null &&
+                              " | " + penalty.rate.toFixed(2) + "% p.a."}
+                            <small>
+                              Section 16, MSMED Act · 3× supplied RBI bank rate
+                              · monthly rests · estimate at {c.as_of}
+                            </small>
                           </td>
                         </tr>
-                      ))}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {!rows.length && (
-          <p className="empty">No invoices match this filter.</p>
-        )}
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          {!rows.length && <p className="empty">No matching invoices.</p>}
+        </section>
         {current && (
-          <section className="line-detail">
-            <PanelTitle end={<span>{current.invoice}</span>}>
-              Invoice ledger
-            </PanelTitle>
-            <dl>
-              <Pair label="Buyer">{current.buyer}</Pair>
-              <Pair label="Issue / effective due">
-                {current.source.issued} / {current.due}
-              </Pair>
-              <Pair label="Open balance">{money(current.balance)}</Pair>
-              <Pair label="Decision">
-                <Badge item={current} />
-              </Pair>
-            </dl>
-            {current.source.dispute_text && (
-              <blockquote>{current.source.dispute_text}</blockquote>
-            )}
-          </section>
+          <Communications
+            key={current.review_key}
+            c={current}
+            refresh={refresh}
+            notify={notify}
+          />
         )}
-      </section>
+      </div>
       {shown && current && (
         <Inspector
           key={current.invoice}
@@ -218,23 +243,31 @@ function EvidenceLine({ p }: { p: LineProof }) {
             <span className="micro">{a.kind}</span>
           </div>
           <dl>
-            <Pair label="Timestamp">{a.timestamp}</Pair>
+            <Pair label={a.kind === "eway" ? "Transit stamp" : "Timestamp"}>
+              {a.timestamp}
+            </Pair>
             <Pair label="Signatory">{a.signer ?? "—"}</Pair>
+            {a.signature && (
+              <Pair label="Verified signature key">{a.signature.key_id}</Pair>
+            )}
             <Pair label="Reviewed by">{a.reviewer}</Pair>
           </dl>
           {a.crop && (
-            <figure>
-              <img
-                src={"data:image/png;base64," + a.crop.png_base64}
-                alt={"Signed delivery note crop for " + a.id}
-              />
-              <figcaption>{a.crop.origin}</figcaption>
-              <details>
-                <summary>OCR transcription &amp; image hash</summary>
-                <pre>{a.crop.ocr_text}</pre>
-                <code>{a.crop.sha256}</code>
-              </details>
-            </figure>
+            <details>
+              <summary>Signed delivery note / OCR</summary>
+              <figure>
+                <img
+                  src={"data:image/png;base64," + a.crop.png_base64}
+                  alt={"Signed delivery note crop for " + a.id}
+                />
+                <figcaption>{a.crop.origin}</figcaption>
+                <details>
+                  <summary>OCR transcription &amp; image hash</summary>
+                  <pre>{a.crop.ocr_text}</pre>
+                  <code>{a.crop.sha256}</code>
+                </details>
+              </figure>
+            </details>
           )}
           {a.attachment && (
             <details>
@@ -254,7 +287,7 @@ function Inspector({ c, close }: { c: Invoice; close: () => void }) {
     <aside className="sheet inspector">
       <div className="pane-heading">
         <div className="flex justify-between items-center">
-          <span className="eyebrow">Execution pane</span>
+          <span className="eyebrow">Verification Engine</span>
           <button
             className="micro"
             aria-label="Close execution pane"
@@ -266,10 +299,26 @@ function Inspector({ c, close }: { c: Invoice; close: () => void }) {
         <h2>{c.invoice}</h2>
         <p>{c.buyer}</p>
       </div>
+      <section className="tax-status">
+        <span className="eyebrow">Tax Match Status</span>
+        <strong>
+          {c.statement === "Matched"
+            ? "MATCHED"
+            : c.statement === "Mismatch"
+              ? "DISCREPANCY"
+              : "UNOBSERVED"}
+        </strong>
+        <p>
+          {c.itc_review
+            ? "ITC payment review open"
+            : "ITC eligibility unconfirmed"}{" "}
+          · {c.source.gstin}
+        </p>
+      </section>
       <div className="tabs">
         {(["Evidence", "Raw JSON", "Tax log"] as const).map((t) => (
           <button key={t} aria-pressed={t === tab} onClick={() => set(t)}>
-            {t}
+            {t === "Evidence" ? "Fulfillment Match" : t}
           </button>
         ))}
       </div>

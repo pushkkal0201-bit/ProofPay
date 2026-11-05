@@ -35,7 +35,7 @@ Open **http://127.0.0.1:8765**. Seven synthetic cases load on first launch. The 
 1. Open **PP-1042 / Kaveri Machine Works**. The buyer asks whether both pumps arrived. Compare the PO clause, two units ordered, signed POD, receiving supervisor and timestamp. The supplied GSTR-2B row also matches the original invoice.
 2. Read the matrix. ₹1,50,000 principal + ₹27,000 GST − ₹40,000 received − ₹5,900 credit = **₹1,31,100 outstanding**. At 41 DPD the proposed letter cites POD-817 and requests a response by 7 November 2026.
 3. Open **PP-1043 / Nilgiri Components**. The receipt covers one of two units. A missing unit blocks the whole-invoice draft. **PP-1046 / Malabar Cloud Services** shows a different failure mode: measured uptime exceeds the target, yet the specific complaint still needs investigation.
-4. Compare **PP-1044** (manager review after 45 days) and **PP-1045** (early reminder). Select **Ask RAV-AI**, review an eligible draft, then export the case packet as JSON. Reopen the workbench to see the saved review.
+4. Compare **PP-1044** (manager review after 45 days) and **PP-1045** (early reminder). Use **Mark compiled text reviewed** on an eligible draft, then export the case packet as JSON. Reopen the workbench to see the saved review.
 5. To demonstrate a revision, copy PP-1042 from the examples folder, change the statement row’s GST by one paisa and import the edited file. Confirm the revision. The case moves to review hold, the old approval no longer applies, and the portfolio still counts that invoice once.
 
 Each example uses a fixed assessment date so the same input gives the same answer during an interview.
@@ -46,10 +46,10 @@ The Python server serves a prebuilt React client. The four workspaces share the 
 
 | Screen | Inspect or act |
 | --- | --- |
-| Causal chain | Expand invoice lines or open the execution pane. Compare signatories, e-way records and uptime; inspect stored verification JSON, source hashes, signed-note crops and OCR text. PP-1047 includes a labeled synthetic scan and its actual OCR transcription. |
+| Audit Ledger | Compare invoice base, CGST/SGST/IGST, net due, aging and dispute locks. Select a row to inspect its fulfillment records, tax match, hashes and signed-note crop. For PP-1047, the amber boundary and inline interest estimate use the reviewed acceptance date and rate history. |
 | Tax ledger | Expand original lines and approved/pending postings. PP-1049 has a debit note, an overdue payment-age review flag and a statement tax-component mismatch despite matching gross GST. |
 | Statutory monitor | Compare acceptance, agreed due date and effective due date. Change the assumed future bank rate and scrub or play the 30-day estimate. Historical rates and the posted ledger stay authoritative. Playback advances one scenario day per second. |
-| Communications | Compare the engine payload with a manually edited channel draft. Edits persist within the browser session by snapshot and channel. Export the edited PDF, an unsent email file or a WhatsApp JSON body to complete in an authorized client. Every export rechecks channel eligibility and snapshot identity. |
+| Resolution & Dispatch | Edit the selected invoice’s notice directly beneath the ledger or in the Dispatch tab. Dispatch Email prepares a mail-client handoff with an .eml fallback. Sync WhatsApp Link prepares an opt-in click-to-chat link. Generate PDF Demand Notice renders the edited text. Each action checks channel eligibility and invoice revision. |
 
 To rebuild the committed assets with Node 22+:
 
@@ -160,7 +160,7 @@ For opt-in hosted inference, set `PROOFPAY_PROVIDER=openai`, `PROOFPAY_MODEL` to
 
 In default **policy** mode, the next-task suggestion is deterministic. To exercise the language-model path, run Ollama locally with an installed chat model. Set `PROOFPAY_MODEL` to its exact installed name before starting ProofPay. For example, in Windows CMD use `set PROOFPAY_MODEL=your-installed-model-name`. On Linux/macOS use `export PROOFPAY_MODEL=your-installed-model-name`.
 
-In Ollama mode the adapter sends the objection and check outcomes to the [local chat endpoint](https://docs.ollama.com/api/chat). The agent chooses read-only ledger, GST or evidence inspections, receives their results and then selects an allowed review task. The UI exposes the tool trace. Repeated tools and final decisions without an inspection are rejected. Each investigation has a four-call limit. A timeout, malformed response or disallowed action returns a visible error. The model cannot set balances, approve evidence, invent deadlines or send a message. The deployed prompt is in [system_prompt.txt](system_prompt.txt).
+In Ollama mode the adapter sends the objection and check outcomes to the [local chat endpoint](https://docs.ollama.com/api/chat). The agent chooses read-only ledger, GST or evidence inspections, receives their results and then selects an allowed review task. The API exposes the tool trace. Repeated tools and final decisions without an inspection are rejected. Each investigation has a four-call limit. A timeout, malformed response or disallowed action returns a visible error. The model cannot set balances, approve evidence, invent deadlines or send a message. The deployed prompt is in [system_prompt.txt](system_prompt.txt).
 
 An operator can set `PROOFPAY_REMITTANCE` to a verified payment instruction before launch. The app includes that exact text in eligible drafts. Use synthetic details for demonstrations. With this setting empty, drafts refer to the parties’ previously agreed instructions. Changing draft wording changes the review key.
 

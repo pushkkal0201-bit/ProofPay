@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { liability } from "./ledgerPolicy";
 import { Chain } from "./Chain";
 import { Tax } from "./Tax";
 import { Monitor } from "./Monitor";
@@ -8,10 +9,10 @@ import { download, Glyph, money, request } from "./shared";
 import type { Invoice, View } from "./types";
 
 const modes: { id: View; name: string; title: string }[] = [
-  { id: "chain", name: "Causal chain", title: "Causal chain matrix" },
+  { id: "chain", name: "Audit Ledger", title: "Receivables & disputes" },
   { id: "tax", name: "Tax ledger", title: "ITC & tax ledger" },
   { id: "msme", name: "Statutory monitor", title: "MSME statutory monitor" },
-  { id: "comms", name: "Communications", title: "Communication workspace" },
+  { id: "comms", name: "Dispatch", title: "Resolution & dispatch" },
 ];
 function App() {
   const [data, load] = useState<Invoice[]>([]),
@@ -38,7 +39,9 @@ function App() {
         .toLowerCase()
         .includes(search.toLowerCase()) &&
       (scope === "All invoices" ||
-        (scope === "On hold" ? c.state === "Review hold" : c.dpd > 45)),
+        (scope === "On hold"
+          ? c.state === "Review hold"
+          : liability(c)?.beyondCeiling)),
   );
   const current = rows.find((c) => c.invoice === selected) ?? rows[0],
     mode = modes.find((m) => m.id === view)!;
@@ -121,11 +124,9 @@ function App() {
           ProofPay
         </div>
         <span className="mast-divider">/</span>
-        <span className="mast-text">Receivables workbench</span>
+        <span className="mast-text">Receivables operations</span>
         <div className="ml-auto flex items-center gap-3">
-          <span className="env">
-            <i /> Local instance
-          </span>
+          <span className="env">Local workspace</span>
           <span className="mono micro">INR</span>
         </div>
       </header>
@@ -136,7 +137,6 @@ function App() {
             aria-current={view === m.id ? "page" : undefined}
             onClick={() => setView(m.id)}
           >
-            <Glyph type={m.id} />
             {m.name}
             <kbd>{i + 1}</kbd>
           </button>
@@ -145,14 +145,11 @@ function App() {
       <main>
         <div className="page-head">
           <div>
-            <div className="eyebrow">
-              Accounts receivable <span>/</span> {mode.name}
-            </div>
             <h1>{mode.title}</h1>
           </div>
           <div className="flex gap-2">
             <button className="btn" onClick={() => upload.current?.click()}>
-              ↑ Import invoice
+              Import invoice
             </button>
             <input
               aria-label="Invoice JSON file"
@@ -175,7 +172,7 @@ function App() {
                   );
               }}
             >
-              Export packet ↗
+              Export packet
             </button>
           </div>
         </div>
@@ -197,9 +194,13 @@ function App() {
             </strong>
           </div>
           <div>
-            <small>Over 45 DPD</small>
-            <strong className={data.some((c) => c.dpd > 45) ? "overdue" : ""}>
-              {data.filter((c) => c.dpd > 45).length}
+            <small>Past MSME ceiling</small>
+            <strong
+              className={
+                data.some((c) => liability(c)?.beyondCeiling) ? "overdue" : ""
+              }
+            >
+              {data.filter((c) => liability(c)?.beyondCeiling).length}
             </strong>
           </div>
         </section>
@@ -220,7 +221,7 @@ function App() {
             value={scope}
             onChange={(e) => setScope(e.target.value)}
           >
-            {["All invoices", "On hold", "Over 45 DPD"].map((s) => (
+            {["All invoices", "On hold", "Past MSME ceiling"].map((s) => (
               <option key={s}>{s}</option>
             ))}
           </select>
@@ -252,7 +253,13 @@ function App() {
             Loading invoice snapshots…
           </div>
         ) : view === "chain" ? (
-          <Chain rows={rows} current={current} choose={choose} />
+          <Chain
+            rows={rows}
+            current={current}
+            choose={choose}
+            refresh={refresh}
+            notify={notify}
+          />
         ) : view === "tax" ? (
           <Tax rows={rows} current={current} choose={choose} />
         ) : view === "msme" ? (

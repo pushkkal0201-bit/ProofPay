@@ -28,6 +28,7 @@ export interface Evidence {
   quantity: number | null;
   attachment: Attachment | null;
   crop?: Crop | null;
+  signature?: { key_id: string; ed25519_base64: string } | null;
 }
 export interface Line {
   id: string;
@@ -108,6 +109,16 @@ export interface Summary {
   };
 }
 export interface Invoice {
+  statutory_clock: {
+    eligible: boolean;
+    day_45: string | null;
+    days_until_due: number;
+  };
+  tax_compliance: {
+    payment_status: string;
+    statement_window: string;
+    payment_deadline: string;
+  };
   invoice: string;
   buyer: string;
   balance: number;
@@ -143,8 +154,3 @@ export interface Invoice {
 }
 export type View = "chain" | "tax" | "msme" | "comms";
 export type Channel = "email" | "whatsapp" | "pdf";
-export interface AgentReply {
-  mode: string;
-  task: string;
-  trace: string[];
-}

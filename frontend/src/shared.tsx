@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import type { Invoice } from "./types";
 
 export const money = (n: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -37,13 +36,6 @@ export async function request(url: string, body?: unknown): Promise<Response> {
     );
   }
   return res;
-}
-export function Badge({ item }: { item: Invoice }) {
-  return (
-    <span className={item.dpd > 45 ? "flag overdue" : "flag"}>
-      {item.state}
-    </span>
-  );
 }
 export function Pair({
   label,

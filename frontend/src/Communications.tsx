@@ -1,48 +1,40 @@
 import { useState } from "react";
-import type { AgentReply, Channel, Invoice } from "./types";
-import { download, Pair, PanelTitle, request } from "./shared";
-export function Communications({
-  c,
-  refresh,
-  notify,
-}: {
+import type { Channel, Invoice } from "./types";
+import { download, PanelTitle, request } from "./shared";
+
+interface Props {
   c: Invoice;
   refresh: () => Promise<void>;
   notify: (s: string) => void;
-}) {
-  const choices: Record<Channel, string | null> = {
-    email: c.COMMUNICATIONS_DRAFT.email,
-    whatsapp: c.COMMUNICATIONS_DRAFT.whatsapp,
-    pdf: c.draft,
-  };
-  const [channel, setChannel] = useState<Channel>(
-    choices.email ? "email" : choices.whatsapp ? "whatsapp" : "pdf",
-  );
-  const [edits, setEdits] = useState<Partial<Record<Channel, string>>>(() => {
+}
+interface WhatsAppBody {
+  text: { body: string };
+}
+
+export function Communications({ c, refresh, notify }: Props) {
+  const initial = c.draft ?? "";
+  const storageKey = "dispatch:" + c.review_key;
+  const [text, setText] = useState(() => {
     try {
-      return (
-        JSON.parse(sessionStorage.getItem("pp:" + c.review_key) ?? "{}") ?? {}
-      );
+      return sessionStorage.getItem(storageKey) ?? initial;
     } catch {
-      return {};
+      return initial;
     }
   });
-  const [advice, setAdvice] = useState<AgentReply | null>(null),
-    [busy, setBusy] = useState(false);
-  const baseline = choices[channel] ?? "",
-    text = edits[channel] ?? baseline;
-  function edit(value: string) {
-    const next = { ...edits, [channel]: value };
-    setEdits(next);
+  const [busy, setBusy] = useState(false);
+  const [link, setLink] = useState("");
+  const [emailFile, setEmailFile] = useState<Blob | null>(null);
+  function edit(s: string) {
+    setText(s);
+    setLink("");
+    setEmailFile(null);
     try {
-      sessionStorage.setItem("pp:" + c.review_key, JSON.stringify(next));
+      sessionStorage.setItem(storageKey, s);
     } catch {
-      notify(
-        "Browser storage unavailable; edit retained in this tab until navigation.",
-      );
+      notify("Session storage unavailable; edits are held in this view.");
     }
   }
-  async function prepare() {
+  async function prepare(channel: Channel) {
     setBusy(true);
     try {
       const r = await request("handoff", {
@@ -51,139 +43,138 @@ export function Communications({
         channel,
         text,
       });
-      const ext = { email: "eml", whatsapp: "json", pdf: "pdf" }[channel];
-      download(await r.blob(), c.invoice + "-draft." + ext);
-      notify("Prepared " + channel + " draft. No message sent.");
+      if (channel === "pdf") {
+        download(await r.blob(), c.invoice + "-notice.pdf");
+        notify("PDF demand notice generated.");
+      } else if (channel === "email") {
+        setEmailFile(await r.blob());
+        const uri =
+          "mailto:?subject=" +
+          encodeURIComponent("Payment reconciliation | " + c.invoice) +
+          "&body=" +
+          encodeURIComponent(text);
+        if (uri.length < 8000) {
+          window.location.href = uri;
+          notify(
+            "Email prepared for your mail client. Select the recipient and send there.",
+          );
+        } else
+          notify(
+            "Email prepared. Download the .eml file to open this long notice in your mail client.",
+          );
+      } else {
+        const payload: WhatsAppBody = await r.json();
+        setLink("https://wa.me/?text=" + encodeURIComponent(payload.text.body));
+        notify(
+          "WhatsApp link ready. Open it to choose the recipient and send.",
+        );
+      }
     } catch (e) {
       notify(String(e));
     } finally {
       setBusy(false);
     }
   }
+  const allowed = {
+    email: !!c.COMMUNICATIONS_DRAFT.email,
+    whatsapp: !!c.COMMUNICATIONS_DRAFT.whatsapp,
+    pdf: !!c.COMMUNICATIONS_DRAFT.pdf_available,
+  };
+  const locked = !initial;
   return (
-    <>
-      <div className="split equal">
-        <section className="sheet">
-          <PanelTitle end={<span>Read only</span>}>Engine payload</PanelTitle>
-          <dl>
-            <Pair label="Invoice">{c.invoice}</Pair>
-            <Pair label="Decision">{c.state}</Pair>
-            <Pair label="Evidence">
-              {c.proof.flatMap((p) => p.anchors.map((a) => a.id)).join(" / ") ||
-                "—"}
-            </Pair>
-          </dl>
-          <pre className="letter">
-            {baseline || c.reasons.join("\n") || c.action}
-          </pre>
-          <div className="inset">
-            <button
-              className="btn"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  const r: AgentReply = await (
-                    await request("agent", { invoice: c.invoice })
-                  ).json();
-                  setAdvice(r);
-                } catch (e) {
-                  notify(String(e));
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              Inspect with RAV-AI
-            </button>
-            {advice && (
-              <p className="footnote">
-                {advice.mode} · {advice.task} · {advice.trace.join(" → ")}
-              </p>
-            )}
-          </div>
-        </section>
-        <section className="sheet">
-          <PanelTitle end={<span>{c.invoice}</span>}>Draft editor</PanelTitle>
-          <div className="tabs">
-            {(["email", "whatsapp", "pdf"] as const).map((k) => (
-              <button
-                key={k}
-                disabled={!choices[k]}
-                aria-pressed={k === channel}
-                onClick={() => setChannel(k)}
-              >
-                {k === "email"
-                  ? "Email"
-                  : k === "pdf"
-                    ? "PDF notice"
-                    : "WhatsApp API"}
-              </button>
-            ))}
-          </div>
+    <section className="sheet dispatch">
+      <PanelTitle end={<span>{c.invoice}</span>}>
+        Resolution &amp; Dispatch
+      </PanelTitle>
+      <div className="envelope">
+        <span>FROM</span>
+        <b>{c.source.creditor}</b>
+        <span>TO</span>
+        <b>{c.buyer} · Accounts payable</b>
+      </div>
+      {locked ? (
+        <div className="lock-message">
+          <b>Dispatch locked</b>
+          <p>{c.reasons.join(" ") || c.action}</p>
+        </div>
+      ) : (
+        <>
+          <label className="editor-heading" htmlFor="correspondence">
+            Notification text{" "}
+            <span>
+              {text === initial ? "System compiled" : "Manually edited"}
+            </span>
+          </label>
           <textarea
-            aria-label="Editable communication draft"
+            id="correspondence"
             className="editor"
-            maxLength={20000}
             value={text}
-            disabled={!baseline}
+            maxLength={20000}
             onChange={(e) => edit(e.target.value)}
-            placeholder="Draft withheld by policy."
+            disabled={busy}
           />
-          <div className="inset">
-            <div className="flex flex-wrap gap-2">
-              <button
-                className="btn primary"
-                disabled={!baseline || !text.trim() || busy}
-                onClick={prepare}
-              >
-                {channel === "pdf"
-                  ? "Generate edited PDF"
-                  : channel === "whatsapp"
-                    ? "Export API body"
-                    : "Download email draft"}
-              </button>
-              <button
-                className="btn"
-                disabled={text === baseline}
-                onClick={() => edit(baseline)}
-              >
-                Reset edits
-              </button>
-            </div>
-            <p className="footnote">
-              {channel === "whatsapp"
-                ? "Insert an authorized recipient and verify session or template eligibility before delivery."
-                : channel === "email"
-                  ? "Open the .eml in your mail client to add the recipient and send."
-                  : "The PDF uses the edited text and the verified financial summary."}
-            </p>
-          </div>
-        </section>
-      </div>
-      <div className="bottom-tools">
-        <span>
-          Engine draft · {c.reviewed ? "review recorded" : "awaiting review"}
-        </span>
-        <button
-          className="btn"
-          disabled={!c.draft || c.reviewed || busy}
-          onClick={async () => {
-            try {
-              await request("review", {
-                invoice: c.invoice,
-                review_key: c.review_key,
-              });
-              await refresh();
-              notify("Engine draft review recorded.");
-            } catch (e) {
-              notify(String(e));
+        </>
+      )}
+      <div className="dispatch-actions">
+        {(["email", "whatsapp", "pdf"] as const).map((channel) => (
+          <button
+            key={channel}
+            className={"btn " + (channel === "email" ? "primary" : "")}
+            disabled={busy || !allowed[channel] || !text.trim()}
+            onClick={() => prepare(channel)}
+          >
+            {
+              {
+                email: "Dispatch Email",
+                whatsapp: "Sync WhatsApp Link",
+                pdf: "Generate PDF Demand Notice",
+              }[channel]
             }
-          }}
-        >
-          Mark engine draft reviewed
-        </button>
+          </button>
+        ))}
       </div>
-    </>
+      {link && (
+        <a className="handoff" href={link} target="_blank" rel="noreferrer">
+          Open WhatsApp message ↗
+        </a>
+      )}
+      {emailFile && (
+        <button
+          className="handoff"
+          onClick={() => download(emailFile, c.invoice + ".eml")}
+        >
+          Download prepared email (.eml)
+        </button>
+      )}
+      {!locked && (
+        <div className="editor-meta">
+          <button
+            disabled={text === initial || busy}
+            onClick={() => edit(initial)}
+          >
+            Restore compiled text
+          </button>
+          <button
+            disabled={c.reviewed || busy || text !== initial}
+            onClick={async () => {
+              try {
+                await request("review", {
+                  invoice: c.invoice,
+                  review_key: c.review_key,
+                });
+                await refresh();
+                notify("Compiled text marked reviewed.");
+              } catch (e) {
+                notify(String(e));
+              }
+            }}
+          >
+            {c.reviewed
+              ? "Compiled text reviewed"
+              : "Mark compiled text reviewed"}
+          </button>
+        </div>
+      )}
+    </section>
   );
 }

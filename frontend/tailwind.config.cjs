@@ -3,10 +3,10 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        canvas: "#0B0F19",
-        rule: "#1E293B",
+        canvas: "#090D16",
+        rule: "#1F293D",
         ink: "#F8FAFC",
-        overdue: "#F59E0B",
+        overdue: "#D97706",
       },
     },
   },
