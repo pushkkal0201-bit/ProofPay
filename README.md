@@ -10,6 +10,8 @@ The [FastAPI backend guide](BACKEND.md) includes Windows setup, an executable in
 
 ## Try it in two minutes
 
+On Windows with Python 3.11 installed, extract the full ZIP and double-click **Start-ProofPay.cmd**. Open http://127.0.0.1:8765 once the server is ready. The local workbench uses the Datum Office paper-and-ink theme with its bundled Space Grotesk heading font.
+
 Extract the repository and open a terminal in the directory containing this README. On Windows Command Prompt:
 
 ```bat
@@ -42,11 +44,12 @@ Each example uses a fixed assessment date so the same input gives the same answe
 
 ## The reviewer workbench
 
+
 The Python server serves a prebuilt React client. The four workspaces share the active invoice. Press **1–4** to switch screens, **J/K** or **↓/↑** to move across filtered invoices and **/** to search. Shortcuts suspend while typing. Use Tab and Enter to expand invoice rows and inspect attachments.
 
 | Screen | Inspect or act |
 | --- | --- |
-| Audit Ledger | Compare invoice base, CGST/SGST/IGST, net due, aging and dispute locks. Select a row to inspect its fulfillment records, tax match, hashes and signed-note crop. For PP-1047, the amber boundary and inline interest estimate use the reviewed acceptance date and rate history. |
+| Audit Ledger | Compare invoice base, CGST/SGST/IGST, net due, aging and dispute locks. Select a row to inspect its fulfillment records, tax match, hashes and signed-note crop. For PP-1047, the double-rule boundary and inline interest estimate use the reviewed acceptance date and rate history. |
 | Tax ledger | Expand original lines and approved/pending postings. PP-1049 has a debit note, an overdue payment-age review flag and a statement tax-component mismatch despite matching gross GST. |
 | Statutory monitor | Compare acceptance, agreed due date and effective due date. Change the assumed future bank rate and scrub or play the 30-day estimate. Historical rates and the posted ledger stay authoritative. Playback advances one scenario day per second. |
 | Resolution & Dispatch | Edit the selected invoice’s notice directly beneath the ledger or in the Dispatch tab. Dispatch Email prepares a mail-client handoff with an .eml fallback. Sync WhatsApp Link prepares an opt-in click-to-chat link. Generate PDF Demand Notice renders the edited text. Each action checks channel eligibility and invoice revision. |

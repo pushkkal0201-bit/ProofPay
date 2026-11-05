@@ -49,6 +49,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.headers.get("Host") not in {f"127.0.0.1:{self.server.server_port}",f"localhost:{self.server.server_port}"}:
             return self.reply(403,{"error":"Use the local application origin."})
         paths = {"/":("index.html","text/html"),"/app.js":("app.js","text/javascript"),
+                 "/space-grotesk.ttf":("space-grotesk.ttf","font/ttf"),
                  "/style.css":("style.css","text/css")}
         if self.path in paths:
             name, mime = paths[self.path]
