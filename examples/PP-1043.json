@@ -1,0 +1,44 @@
+{
+  "creditor": "Meridian Systems Pvt Ltd",
+  "buyer": "Nilgiri Components",
+  "gstin": "27ABCDE1234F1Z9",
+  "master_gstin": "27ABCDE1234F1Z9",
+  "master_name": "Nilgiri Components",
+  "invoice": "PP-1043",
+  "issued": "2026-08-25",
+  "due": "2026-10-22",
+  "as_of": "2026-11-05",
+  "dispute": "none",
+  "dispute_text": null,
+  "lines": [
+    {
+      "id": "L1",
+      "description": "Industrial pump assemblies",
+      "kind": "goods",
+      "quantity": 2,
+      "principal": 15000000,
+      "gst": 2700000,
+      "clause": "PO-717 §4 · delivery of two units"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "POD-1043",
+      "invoice": "PP-1043",
+      "line": "L1",
+      "kind": "POD",
+      "timestamp": "2026-08-27T14:22:00+05:30",
+      "source": "Receiving register / folio 817",
+      "reviewer": "Demo controller",
+      "verified": true,
+      "signer": "R. Shah, receiving supervisor",
+      "quantity": 1,
+      "attachment": {
+        "filename": "POD-1043.txt",
+        "text": "SYNTHETIC DEMO RECORD\nPOD POD-1043 | PP-1043 | L1\nRecorded 2026-08-27T14:22:00+05:30\nQuantity accepted: 1\nAcknowledged by: R. Shah, receiving supervisor\n",
+        "sha256": "8b3810740980a63c8d948cbbce52737ee215fe4a770503cb82bb04d892830a25"
+      }
+    }
+  ],
+  "ledger": []
+}

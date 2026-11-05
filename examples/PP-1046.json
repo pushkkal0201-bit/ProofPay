@@ -1,0 +1,62 @@
+{
+  "creditor": "Meridian Systems Pvt Ltd",
+  "buyer": "Malabar Cloud Services",
+  "gstin": "27ABCDE1234F1Z9",
+  "master_gstin": "27ABCDE1234F1Z9",
+  "master_name": "Malabar Cloud Services",
+  "invoice": "PP-1046",
+  "issued": "2026-10-01",
+  "due": "2026-10-20",
+  "as_of": "2026-11-05",
+  "dispute": "performance",
+  "dispute_text": "Our September service was interrupted.",
+  "lines": [
+    {
+      "id": "L1",
+      "description": "September managed hosting",
+      "kind": "service",
+      "quantity": 1,
+      "principal": 15000000,
+      "gst": 2700000,
+      "clause": "MSA §7 · September uptime",
+      "uptime_target_bps": 9990
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ACC-46",
+      "invoice": "PP-1046",
+      "line": "L1",
+      "kind": "acceptance",
+      "timestamp": "2026-10-02T16:00:00+05:30",
+      "source": "Receiving register / folio 817",
+      "reviewer": "Demo controller",
+      "verified": true,
+      "signer": "R. Shah, receiving supervisor",
+      "quantity": 1,
+      "attachment": {
+        "filename": "ACC-46.txt",
+        "text": "SYNTHETIC DEMO RECORD\nacceptance ACC-46 | PP-1046 | L1\nRecorded 2026-10-02T16:00:00+05:30\nQuantity accepted: 1\nAcknowledged by: R. Shah, receiving supervisor\n",
+        "sha256": "3017195de454ec26291bc3057f8e840d1dd732fb91d59046f227478a472cc3b9"
+      }
+    },
+    {
+      "id": "MET-46",
+      "invoice": "PP-1046",
+      "line": "L1",
+      "kind": "telemetry",
+      "timestamp": "2026-10-02T16:00:00+05:30",
+      "source": "September monitor summary",
+      "reviewer": "Demo controller",
+      "verified": true,
+      "uptime_bps": 9996,
+      "covers_contract_period": true,
+      "attachment": {
+        "filename": "MET-46.txt",
+        "text": "SYNTHETIC DEMO RECORD\ntelemetry MET-46 | PP-1046 | L1\nRecorded 2026-10-02T16:00:00+05:30\nMeasured uptime: 99.96% for the September contract period.\n",
+        "sha256": "0231fa633478f1d2cb54eacfa65d859c51788f3299664ae4d7ff3ac8e325d5a7"
+      }
+    }
+  ],
+  "ledger": []
+}

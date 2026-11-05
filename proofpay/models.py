@@ -1,0 +1,98 @@
+"""Input contract. All values represent one invoice snapshot in INR paise."""
+from datetime import date
+from typing import Annotated, Literal
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
+
+Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
+Amount = Annotated[int, Field(strict=True, ge=0, le=10**11)]
+Quantity = Annotated[int, Field(strict=True, gt=0, le=10**8)]
+Bps = Annotated[int, Field(strict=True, ge=0, le=10000)]
+
+
+class Record(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class Line(Record):
+    id: Text
+    description: Text
+    kind: Literal["goods", "service"]
+    quantity: Quantity
+    principal: Amount
+    gst: Amount
+    clause: Text
+    uptime_target_bps: Bps | None = None
+
+
+class Attachment(Record):
+    filename: Text
+    text: Annotated[str, Field(min_length=1, max_length=18000)]
+    sha256: Annotated[str, Field(pattern="^[0-9a-f]{64}$")]
+
+
+class Evidence(Record):
+    attachment: Attachment | None = None
+    id: Text
+    invoice: Text
+    line: Text
+    kind: Literal["POD", "BOL", "acceptance", "telemetry"]
+    timestamp: AwareDatetime
+    source: Text
+    reviewer: Text
+    verified: bool
+    signer: Text | None = None
+    quantity: Quantity | None = None
+    uptime_bps: Bps | None = None
+    covers_contract_period: bool = False
+
+
+class Entry(Record):
+    id: Text
+    kind: Literal["payment", "credit", "debit"]
+    date: date
+    base: Amount
+    gst: Amount
+    approved: bool
+
+
+class StatementRow(Record):
+    """Recipient statement snapshot of the original invoice, before adjustments."""
+    invoice: Text
+    supplier_gstin: Text
+    recipient_gstin: Text
+    issued: date
+    principal: Amount
+    gst: Amount
+
+
+class Case(Record):
+    supplier_gstin: Text | None = None
+    statement_row: StatementRow | None = None
+    invoice: Text
+    creditor: Text
+    buyer: Text
+    gstin: Text
+    master_gstin: Text | None
+    master_name: Text | None
+    issued: date
+    due: date
+    as_of: date
+    dispute: Literal["none", "non_receipt", "performance", "other"]
+    dispute_text: Text | None = None
+    reverse_charge: bool = False
+    lines: list[Line] = Field(min_length=1, max_length=300)
+    evidence: list[Evidence] = Field(max_length=1000)
+    ledger: list[Entry] = Field(max_length=1000)
+
+    @model_validator(mode="after")
+    def check_snapshot(self):
+        if min(self.as_of, self.due) < self.issued:
+            raise ValueError("Snapshot and due date must be on or after issue.")
+        for records in [self.lines, self.evidence, self.ledger]:
+            if len({r.id for r in records}) != len(records):
+                raise ValueError("Duplicate IDs within a record collection.")
+        if any(e.date > self.as_of for e in self.ledger):
+            raise ValueError("Ledger contains future entries.")
+        if any(e.kind == "payment" and e.gst for e in self.ledger):
+            raise ValueError("Record the full cash payment in base with gst=0.")
+        return self

@@ -1,0 +1,44 @@
+{
+  "creditor": "Meridian Systems Pvt Ltd",
+  "buyer": "Deccan Industrial Supply",
+  "gstin": "27ABCDE1234F1Z9",
+  "master_gstin": "27ABCDE1234F1Z9",
+  "master_name": "Deccan Industrial Supply",
+  "invoice": "PP-1044",
+  "issued": "2026-08-25",
+  "due": "2026-09-01",
+  "as_of": "2026-11-05",
+  "dispute": "none",
+  "dispute_text": null,
+  "lines": [
+    {
+      "id": "L1",
+      "description": "Industrial pump assemblies",
+      "kind": "goods",
+      "quantity": 2,
+      "principal": 15000000,
+      "gst": 2700000,
+      "clause": "PO-717 §4 · delivery of two units"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "POD-1044",
+      "invoice": "PP-1044",
+      "line": "L1",
+      "kind": "POD",
+      "timestamp": "2026-08-27T14:22:00+05:30",
+      "source": "Receiving register / folio 817",
+      "reviewer": "Demo controller",
+      "verified": true,
+      "signer": "R. Shah, receiving supervisor",
+      "quantity": 2,
+      "attachment": {
+        "filename": "POD-1044.txt",
+        "text": "SYNTHETIC DEMO RECORD\nPOD POD-1044 | PP-1044 | L1\nRecorded 2026-08-27T14:22:00+05:30\nQuantity accepted: 2\nAcknowledged by: R. Shah, receiving supervisor\n",
+        "sha256": "cc5e7a66488225090555582799fb0d1bbf130b628a78271ed193988fa838de8c"
+      }
+    }
+  ],
+  "ledger": []
+}

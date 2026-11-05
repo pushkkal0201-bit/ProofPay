@@ -1,0 +1,70 @@
+{
+  "creditor": "Meridian Systems Pvt Ltd",
+  "buyer": "Kaveri Machine Works",
+  "gstin": "27ABCDE1234F1Z9",
+  "master_gstin": "27ABCDE1234F1Z9",
+  "master_name": "Kaveri Machine Works",
+  "invoice": "PP-1042",
+  "issued": "2026-08-25",
+  "due": "2026-09-25",
+  "as_of": "2026-11-05",
+  "dispute": "non_receipt",
+  "dispute_text": "Please confirm whether both pump units arrived.",
+  "lines": [
+    {
+      "id": "L1",
+      "description": "Industrial pump assemblies",
+      "kind": "goods",
+      "quantity": 2,
+      "principal": 15000000,
+      "gst": 2700000,
+      "clause": "PO-717 §4 · delivery of two units"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "POD-817",
+      "invoice": "PP-1042",
+      "line": "L1",
+      "kind": "POD",
+      "timestamp": "2026-08-27T14:22:00+05:30",
+      "source": "Receiving register / folio 817",
+      "reviewer": "Demo controller",
+      "verified": true,
+      "signer": "R. Shah, receiving supervisor",
+      "quantity": 2,
+      "attachment": {
+        "filename": "POD-817.txt",
+        "text": "SYNTHETIC DEMO RECORD\nPOD POD-817 | PP-1042 | L1\nRecorded 2026-08-27T14:22:00+05:30\nQuantity accepted: 2\nAcknowledged by: R. Shah, receiving supervisor\n",
+        "sha256": "f650d78268f1d4b6935087ff26e3d0e3fc739fcbb178303d9fc1d2254ddf802f"
+      }
+    }
+  ],
+  "ledger": [
+    {
+      "id": "PAY-18",
+      "kind": "payment",
+      "date": "2026-10-01",
+      "base": 4000000,
+      "gst": 0,
+      "approved": true
+    },
+    {
+      "id": "CN-19",
+      "kind": "credit",
+      "date": "2026-10-02",
+      "base": 500000,
+      "gst": 90000,
+      "approved": true
+    }
+  ],
+  "supplier_gstin": "27FGHIJ4321K1Z0",
+  "statement_row": {
+    "invoice": "PP-1042",
+    "issued": "2026-08-25",
+    "recipient_gstin": "27ABCDE1234F1Z9",
+    "supplier_gstin": "27FGHIJ4321K1Z0",
+    "principal": 15000000,
+    "gst": 2700000
+  }
+}
