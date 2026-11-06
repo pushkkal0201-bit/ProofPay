@@ -89,10 +89,10 @@ class EngineTests(unittest.TestCase):
             with self.assertRaises(ValidationError): Case.model_validate(d)
 
     def test_model_cannot_invent_actions(self):
-        with patch.dict(os.environ,{'PROOFPAY_MODEL':'demo'}), patch('proofpay.agent.ask_model') as call:
-            call.side_effect=[{"tool":"read_evidence"},{"task":"review_draft"}]*2
+        with patch.dict(os.environ,{'PROOFPAY_MODEL':'demo'}), patch('proofpay.agent.ask_model',return_value={"task":"review_draft"}):
             result=suggest(self.c,analyze(self.c))
-            self.assertEqual(result["trace"],["read_evidence"])
+            self.assertEqual(result["task"],"Review the proposed wording and deadline.")
+            self.assertEqual(len(result["inspections"]),3)
             with self.assertRaises(ValueError):
                 suggest(fixture(1043),analyze(fixture(1043)))
 
@@ -102,8 +102,8 @@ class EngineTests(unittest.TestCase):
         self.assertIsNone(r["draft"])
         self.assertIn("checksum", r["proof"][0]["gaps"][0])
 
-    def test_agent_rejects_repeated_tool(self):
-        with patch.dict(os.environ,{'PROOFPAY_MODEL':'demo'}), patch('proofpay.agent.ask_model',return_value={"tool":"read_gst"}):
+    def test_agent_rejects_unknown_task(self):
+        with patch.dict(os.environ,{'PROOFPAY_MODEL':'demo'}), patch('proofpay.agent.ask_model',return_value={"task":"send_payment_demand"}):
             with self.assertRaises(ValueError): suggest(self.c,analyze(self.c))
 
 

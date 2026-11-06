@@ -75,20 +75,25 @@ def suggest(case, report):
     system = (Path(__file__).resolve().parents[1] / "system_prompt.txt").read_text(encoding="utf-8")
     facts = dict(state=report["state"], reasons=report["reasons"], objection=case.dispute_text,
                  allowed_tasks=options, tools=list(views))
-    messages = [{"role":"system","content":system}, {"role":"user","content":json.dumps(facts)}]
-    trace = []
-    for _ in range(len(views)+1):
-        decision = ask_model(model, messages)
-        if not isinstance(decision,dict):
-            raise ValueError("Expected an action object.")
-        if set(decision) == {"task"} and trace and decision["task"] in options:
-            return dict(mode=model, provider=os.environ.get("PROOFPAY_PROVIDER", "ollama"),
-                        task=TASKS[decision["task"]], trace=trace,
-                        inspections=[dict(tool=name, result=views[name]) for name in trace])
-        tool = decision.get("tool")
-        if set(decision) != {"tool"} or tool not in views or tool in trace:
-            raise ValueError("Expected an unused inspection tool or a valid final task.")
-        trace.append(tool)
-        messages.extend([{"role":"assistant","content":json.dumps(decision)},
-                         {"role":"user","content":json.dumps({"result":views[tool]})}])
-    raise ValueError("Investigation step budget exhausted.")
+    facts = dict(
+        invoice=case.invoice,
+        buyer=case.buyer,
+        state=report["state"],
+        objection=case.dispute_text,
+        reasons=report["reasons"],
+        allowed_tasks=options,
+        inspections=[dict(tool=name, result=value) for name, value in views.items()],
+    )
+    decision = ask_model(model, [
+        {"role": "system", "content": system},
+        {"role": "user", "content": json.dumps(facts)},
+    ])
+    if not isinstance(decision, dict) or set(decision) != {"task"} or decision["task"] not in options:
+        raise ValueError("Model must return one allowed task as JSON.")
+    return dict(
+        mode=model,
+        provider=os.environ.get("PROOFPAY_PROVIDER", "ollama"),
+        task=TASKS[decision["task"]],
+        trace=list(views),
+        inspections=[dict(tool=name, result=value) for name, value in views.items()],
+    )

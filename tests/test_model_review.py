@@ -44,15 +44,14 @@ class ReviewIntegrationTests(unittest.TestCase):
 
     def test_model_inspections_and_snapshot_binding(self):
         with patch.dict(os.environ, {"PROOFPAY_MODEL": "fixture", "PROOFPAY_PROVIDER": "ollama"}):
-            with patch("proofpay.agent.ask_model", side_effect=[
-                {"tool": "read_evidence"}, {"task": "check_source"}
-            ]):
+            with patch("proofpay.agent.ask_model", return_value={"task": "check_source"}):
                 result = self.review()
         self.assertEqual(result["review_key"], self.case["review_key"])
         self.assertEqual(result["provider"], "ollama")
-        self.assertEqual(result["inspections"][0]["result"][0]["submitted_records"][0]["id"], "POD-1043")
-        self.assertEqual(result["inspections"][0]["result"][0]["submitted_records"][0]["quantity"], 1)
-        self.assertTrue(result["inspections"][0]["result"][0]["gaps"])
+        evidence = next(i["result"] for i in result["inspections"] if i["tool"] == "read_evidence")
+        self.assertEqual(evidence[0]["submitted_records"][0]["id"], "POD-1043")
+        self.assertEqual(evidence[0]["submitted_records"][0]["quantity"], 1)
+        self.assertTrue(evidence[0]["gaps"])
 
     def test_model_required_and_stale_requests(self):
         with patch.dict(os.environ, {"PROOFPAY_MODEL": ""}):
@@ -86,9 +85,9 @@ class ReviewIntegrationTests(unittest.TestCase):
                     self.review()
                 self.assertEqual(error.exception.code, 503)
 
-    def test_final_action_requires_inspection(self):
+    def test_model_selects_from_allowed_tasks(self):
         case = Case.model_validate(self.case["source"])
         with patch.dict(os.environ, {"PROOFPAY_MODEL": "fixture"}):
-            with patch("proofpay.agent.ask_model", return_value={"task": "check_source"}):
+            with patch("proofpay.agent.ask_model", return_value={"task": "not_allowed"}):
                 with self.assertRaises(ValueError):
                     suggest(case, analyze(case))
