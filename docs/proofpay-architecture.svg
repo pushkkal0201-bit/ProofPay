@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 530" role="img" aria-labelledby="title desc">
+  <title id="title">ProofPay case review architecture</title>
+  <desc id="desc">Invoice records pass through the local workbench or FastAPI service, then through shared ledger, evidence, tax, and escalation checks into versioned records. An optional model review inspects selected records and returns a proposed task.</desc>
+  <defs>
+    <style>
+      .bg { fill: #090d16; }
+      .panel { fill: #101725; stroke: #263247; stroke-width: 1.5; }
+      .inner { fill: #0b111d; stroke: #263247; stroke-width: 1; }
+      .ink { fill: #f4f6f8; font: 600 18px 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; }
+      .sub { fill: #a3adbb; font: 14px 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; }
+      .micro { fill: #718096; font: 12px 'SFMono-Regular', Consolas, 'Liberation Mono', monospace; letter-spacing: 1.1px; }
+      .line { fill: none; stroke: #46536a; stroke-width: 2; }
+      .dash { fill: none; stroke: #69778c; stroke-width: 1.5; stroke-dasharray: 5 7; }
+      .accent { fill: #d97706; }
+      .accent-stroke { stroke: #d97706; }
+      .rule { stroke: #263247; stroke-width: 1; }
+    </style>
+  </defs>
+  <rect class="bg" width="1280" height="530" />
+  <text x="44" y="49" class="micro">PROOFPAY / RECEIVABLES REVIEW PIPELINE</text>
+  <text x="44" y="82" class="ink" font-size="24">One invoice record. Four independent checks. A traceable review.</text>
+  <line x1="44" y1="108" x2="1236" y2="108" class="rule" />
+
+  <rect x="44" y="150" width="201" height="140" class="panel" />
+  <text x="64" y="181" class="micro">01 / SOURCE</text>
+  <text x="64" y="215" class="ink">Invoice snapshot</text>
+  <text x="64" y="243" class="sub">Lines · GST · terms</text>
+  <text x="64" y="265" class="sub">Payments · evidence</text>
+
+  <rect x="309" y="150" width="198" height="140" class="panel" />
+  <text x="329" y="181" class="micro">02 / ENTRY POINTS</text>
+  <text x="329" y="215" class="ink">Review surfaces</text>
+  <text x="329" y="243" class="sub">React workbench</text>
+  <text x="329" y="265" class="sub">CLI · FastAPI</text>
+
+  <rect x="568" y="132" width="264" height="176" class="panel" />
+  <text x="588" y="163" class="micro">03 / SHARED DOMAIN LOGIC</text>
+  <rect x="588" y="180" width="224" height="27" class="inner" />
+  <rect x="588" y="213" width="224" height="27" class="inner" />
+  <rect x="588" y="246" width="224" height="27" class="inner" />
+  <text x="601" y="199" class="sub">Ledger and tax reconciliation</text>
+  <text x="601" y="232" class="sub">Line-level evidence checks</text>
+  <text x="601" y="265" class="sub">Aging and escalation policy</text>
+
+  <rect x="894" y="150" width="342" height="140" class="panel" />
+  <text x="914" y="181" class="micro">04 / REVIEW RECORD</text>
+  <text x="914" y="215" class="ink">Versioned decision</text>
+  <text x="914" y="243" class="sub">Source + report + audit hashes</text>
+  <text x="914" y="265" class="sub">SQLite journal · export receipt</text>
+
+  <path d="M245 220 H309 M507 220 H568 M832 220 H894" class="line" />
+  <circle r="5" class="accent"><animateMotion dur="1.2s" repeatCount="indefinite" path="M245 220 H309" /></circle>
+  <circle r="5" class="accent"><animateMotion dur="1.2s" begin="1.2s" repeatCount="indefinite" path="M507 220 H568" /></circle>
+  <circle r="5" class="accent"><animateMotion dur="1.2s" begin="2.4s" repeatCount="indefinite" path="M832 220 H894" /></circle>
+
+  <line x1="44" y1="337" x2="1236" y2="337" class="rule" />
+  <text x="44" y="369" class="micro">OPTIONAL / MODEL-ASSISTED REVIEW</text>
+  <rect x="44" y="390" width="274" height="88" class="inner" />
+  <text x="64" y="421" class="ink">Selected case records</text>
+  <text x="64" y="448" class="sub">Objection · ledger · evidence · tax</text>
+  <rect x="454" y="390" width="274" height="88" class="inner" />
+  <text x="474" y="421" class="ink">Configured model provider</text>
+  <text x="474" y="448" class="sub">Ollama local · hosted endpoint</text>
+  <rect x="894" y="390" width="342" height="88" class="inner" />
+  <text x="914" y="421" class="ink">Proposed review task</text>
+  <text x="914" y="448" class="sub">Reviewer sees sources and decides</text>
+  <path d="M318 434 H454 M728 434 H894" class="dash" />
+  <path d="M408 290 V337 H181 V390" class="dash" />
+  <path d="M318 434 H454 M728 434 H894" class="dash" />
+  <circle r="4" class="accent"><animateMotion dur="1.3s" repeatCount="indefinite" path="M318 434 H454" /></circle>
+  <circle r="4" class="accent"><animateMotion dur="1.3s" begin="1.3s" repeatCount="indefinite" path="M728 434 H894" /></circle>
+  <text x="44" y="510" class="micro">ACCOUNTING AND EVIDENCE OUTCOMES ARE CALCULATED BY THE APPLICATION SERVICES.</text>
+</svg>
