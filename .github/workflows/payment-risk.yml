@@ -1,0 +1,24 @@
+name: Payment risk checks
+
+on:
+  pull_request:
+  push:
+    branches: [main, feature/payment-delay-risk-baseline]
+
+jobs:
+  payment-risk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install model and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-ml.txt -r requirements-test.txt
+      - name: Run payment-risk tests
+        run: python -m pytest -q tests/test_payment_risk.py
+      - name: Check Python compilation
+        run: python -m compileall -q proofpay/payment_risk.py scripts/evaluate_payment_risk.py
