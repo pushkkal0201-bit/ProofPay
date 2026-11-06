@@ -6,7 +6,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from .models import Case
 from .engine import analyze
-from .agent import suggest
+from .agent import suggest, configuration
 from engine.intake import VersionConflict, post_portfolio, CashReceipt, match_statement, parse_record, reconcile_batch, review_profile
 from engine.notices import render_notice
 from engine.workbench import Projection, Handoff, project, handoff
@@ -55,6 +55,8 @@ class Handler(BaseHTTPRequestHandler):
         if self.path in paths:
             name, mime = paths[self.path]
             return self.reply(200, (STATIC/name).read_bytes(), mime)
+        if self.path == "/api/review-config":
+            return self.reply(200, configuration())
         if self.path == "/api/schema":
             return self.reply(200, Case.model_json_schema())
         if self.path == "/api/cases":
@@ -128,8 +130,17 @@ class Handler(BaseHTTPRequestHandler):
                         return self.reply(409,{"error":"A current eligible draft is required."})
                     return self.reply(200,render_notice(report),"application/pdf")
                 if self.path == "/api/agent":
+                    key = review_key(row[0], report)
+                    if data.get("review_key", key) != key:
+                        return self.reply(409, {"error": "Snapshot changed. Reload before review."})
+                    if data.get("require_model") and not configuration()["configured"]:
+                        return self.reply(503, {"error": "Configure a review model and restart ProofPay."})
                     try:
-                        return self.reply(200,suggest(case,report))
+                        result = suggest(case, report)
+                        latest = db.execute("SELECT data FROM cases WHERE id=?", (case.invoice,)).fetchone()
+                        if not latest or latest[0] != row[0]:
+                            return self.reply(409, {"error": "Snapshot changed during review. Reload and retry."})
+                        return self.reply(200, dict(result, invoice=case.invoice, review_key=key))
                     except (OSError,ValueError,TypeError,KeyError,IndexError):
                         return self.reply(503,{"error":"Inference provider unavailable or invalid response. Case unchanged."})
                 key = review_key(row[0],report)

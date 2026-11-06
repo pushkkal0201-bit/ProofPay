@@ -4,6 +4,7 @@ import { liability } from "./ledgerPolicy";
 import { Chain } from "./Chain";
 import { Tax } from "./Tax";
 import { Monitor } from "./Monitor";
+import { Review } from "./Review";
 import { Communications } from "./Communications";
 import { download, Glyph, money, request } from "./shared";
 import type { Invoice, View } from "./types";
@@ -282,6 +283,7 @@ function App() {
         ) : (
           <p className="empty">No matching invoices.</p>
         )}
+        {current && <Review key={current.review_key} invoice={current} />}
         <footer>
           <span>
             <kbd>J</kbd> <kbd>K</kbd> Select invoice <b>·</b> <kbd>1–4</kbd>{" "}

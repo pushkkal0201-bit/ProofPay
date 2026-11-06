@@ -12,6 +12,14 @@ TASKS = {
 }
 
 
+def configuration():
+    model = os.environ.get("PROOFPAY_MODEL", "").strip()
+    provider = os.environ.get("PROOFPAY_PROVIDER", "ollama")
+    return dict(model=model or None, provider=provider if model else "policy",
+                configured=bool(model) and provider in ("ollama", "openai") and
+                (provider != "openai" or bool(os.environ.get("ENGINE_API_KEY"))))
+
+
 def ask_model(model, messages):
     provider = os.environ.get("PROOFPAY_PROVIDER", "ollama")
     headers = {"Content-Type": "application/json"}
@@ -30,7 +38,7 @@ def ask_model(model, messages):
     else:
         raise ValueError("Unknown inference provider.")
     req = Request(endpoint, data=json.dumps(payload).encode(), headers=headers)
-    with urlopen(req, timeout=25) as res:
+    with urlopen(req, timeout=120) as res:
         body = json.loads(res.read(262144))
     message = body["choices"][0]["message"] if provider == "openai" else body["message"]
     return json.loads(message["content"])
@@ -40,7 +48,7 @@ def suggest(case, report):
     options = ["check_source", "check_ledger", "check_contract"]
     if report["draft"]:
         options.append("review_draft")
-    model = os.environ.get("PROOFPAY_MODEL")
+    model = os.environ.get("PROOFPAY_MODEL", "").strip()
     if not model:
         if report["draft"]:
             choice = "review_draft"
@@ -55,7 +63,12 @@ def suggest(case, report):
     views = {
         "read_ledger": report["LEDGER_SUMMARY"],
         "read_evidence": [dict(line=p["line"], clause=p["clause"], gaps=p["gaps"],
-                               references=[e["id"] for e in p["anchors"]]) for p in report["proof"]],
+                               references=[e["id"] for e in p["anchors"]],
+                               milestones=p["truth_table"],
+                               submitted_records=[dict(id=e.id, kind=e.kind, quantity=e.quantity,
+                                                       verified=e.verified, timestamp=e.timestamp.isoformat())
+                                                  for e in case.evidence if e.line == p["line"]
+                                                  and e.invoice == case.invoice]) for p in report["proof"]],
         "read_gst": dict(master_match=report["master_match"], statement=report["statement"],
                          itc_review=report["itc_review"], adjusted_split=report["LEDGER_SUMMARY"]["adjusted_tax_split"]),
     }
@@ -69,7 +82,9 @@ def suggest(case, report):
         if not isinstance(decision,dict):
             raise ValueError("Expected an action object.")
         if set(decision) == {"task"} and trace and decision["task"] in options:
-            return dict(mode=model, task=TASKS[decision["task"]], trace=trace)
+            return dict(mode=model, provider=os.environ.get("PROOFPAY_PROVIDER", "ollama"),
+                        task=TASKS[decision["task"]], trace=trace,
+                        inspections=[dict(tool=name, result=views[name]) for name in trace])
         tool = decision.get("tool")
         if set(decision) != {"tool"} or tool not in views or tool in trace:
             raise ValueError("Expected an unused inspection tool or a valid final task.")

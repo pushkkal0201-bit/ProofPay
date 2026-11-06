@@ -117,3 +117,27 @@ npm run build --prefix frontend
 ```
 
 Use Node.js 22 for frontend builds. The Python launcher serves the compiled files from the repository.
+
+## Model-assisted dispute review
+
+The **Dispute review** panel accepts the selected invoice and requests a review task from a configured model. The model inspects read-only evidence, ledger or GST views before selecting an allowed next action. Expand the returned steps to see the exact records inspected. The panel reports the provider and model used.
+
+For local inference, install [Ollama](https://ollama.com/download/windows), open it, and download a model. Run the following in CMD:
+
+```bat
+ollama pull qwen2.5:3b
+```
+
+Stop the existing ProofPay server with Ctrl+C. From the project folder run:
+
+```bat
+Start-Model-Review.cmd
+```
+
+Enter **qwen2.5:3b** when prompted. Open http://127.0.0.1:8770/workbench, select **PP-1043**, and click **Run model review** in the Dispute review panel beneath the workspace. The panel displays the selected task and the inspected records. Provider failures appear in the panel and can be retried.
+
+For an existing Ollama model, enter its exact name from `ollama list`. The adapter uses the [Ollama chat endpoint](https://docs.ollama.com/api/chat) with JSON responses. On macOS or Linux, set `PROOFPAY_PROVIDER=ollama` and `PROOFPAY_MODEL` in the server environment before starting ProofPay.
+
+Hosted inference uses `PROOFPAY_PROVIDER=openai`, `PROOFPAY_MODEL` and `ENGINE_API_KEY`. Choose a Chat Completions model supporting JSON output and temperature. The review button sends the objection and selected record views to that provider. Credentials stay in the server environment.
+
+Financial calculations, evidence decisions and correspondence eligibility remain governed by the domain services. Each model run has at most three distinct inspections and one final action. The endpoint checks the invoice revision before and after inference.
