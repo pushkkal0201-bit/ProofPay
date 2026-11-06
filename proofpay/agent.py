@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError
 
 TASKS = {
     "check_source": "Inspect the original evidence for the flagged line.",
@@ -20,7 +21,7 @@ def configuration():
                 (provider != "openai" or bool(os.environ.get("ENGINE_API_KEY"))))
 
 
-def ask_model(model, messages):
+def ask_model(model, messages, response_schema=None):
     provider = os.environ.get("PROOFPAY_PROVIDER", "ollama")
     headers = {"Content-Type": "application/json"}
     if provider == "openai":
@@ -33,13 +34,17 @@ def ask_model(model, messages):
                        response_format={"type":"json_object"}, store=False)
     elif provider == "ollama":
         endpoint = "http://127.0.0.1:11434/api/chat"
-        payload = dict(model=model, messages=messages, stream=False, format="json",
-                       options={"temperature":0.15})
+        payload = dict(model=model, messages=messages, stream=False,
+                       format=response_schema or "json", options={"temperature":0.15})
     else:
         raise ValueError("Unknown inference provider.")
     req = Request(endpoint, data=json.dumps(payload).encode(), headers=headers)
-    with urlopen(req, timeout=120) as res:
-        body = json.loads(res.read(262144))
+    try:
+        with urlopen(req, timeout=180) as res:
+            body = json.loads(res.read(262144))
+    except HTTPError as err:
+        detail = err.read(1200).decode("utf-8", errors="replace")
+        raise ValueError(f"{provider} returned HTTP {err.code}: {detail}") from err
     message = body["choices"][0]["message"] if provider == "openai" else body["message"]
     return json.loads(message["content"])
 
@@ -84,10 +89,16 @@ def suggest(case, report):
         allowed_tasks=options,
         inspections=[dict(tool=name, result=value) for name, value in views.items()],
     )
+    response_schema = {
+        "type": "object",
+        "properties": {"task": {"type": "string", "enum": options}},
+        "required": ["task"],
+        "additionalProperties": False,
+    }
     decision = ask_model(model, [
         {"role": "system", "content": system},
         {"role": "user", "content": json.dumps(facts)},
-    ])
+    ], response_schema=response_schema)
     if not isinstance(decision, dict) or set(decision) != {"task"} or decision["task"] not in options:
         raise ValueError("Model must return one allowed task as JSON.")
     return dict(

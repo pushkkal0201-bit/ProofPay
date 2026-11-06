@@ -141,8 +141,9 @@ class Handler(BaseHTTPRequestHandler):
                         if not latest or latest[0] != row[0]:
                             return self.reply(409, {"error": "Snapshot changed during review. Reload and retry."})
                         return self.reply(200, dict(result, invoice=case.invoice, review_key=key))
-                    except (OSError,ValueError,TypeError,KeyError,IndexError):
-                        return self.reply(503,{"error":"Inference provider unavailable or invalid response. Case unchanged."})
+                    except (OSError,ValueError,TypeError,KeyError,IndexError) as err:
+                        detail = f"{type(err).__name__}: {err}"[:500]
+                        return self.reply(503,{"error":f"Model review failed. {detail}"})
                 key = review_key(row[0],report)
                 if not report["draft"] or data["review_key"] != key:
                     return self.reply(409,{"error":"Review requires a current eligible draft."})
