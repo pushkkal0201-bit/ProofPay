@@ -141,3 +141,19 @@ For an existing Ollama model, enter its exact name from `ollama list`. The adapt
 Hosted inference uses `PROOFPAY_PROVIDER=openai`, `PROOFPAY_MODEL` and `ENGINE_API_KEY`. Choose a Chat Completions model supporting JSON output and temperature. The review button sends the objection and selected record views to that provider. Credentials stay in the server environment.
 
 Financial calculations, evidence decisions and correspondence eligibility remain governed by the domain services. Each model run has at most three distinct inspections and one final action. The endpoint checks the invoice revision before and after inference.
+
+## Try the review on other invoices
+
+Select an invoice in Audit Ledger, then run **Dispute review** beneath the workspace. Expand Delivery evidence, Financial ledger and Tax records to inspect the structured source checks. Expand **Raw record JSON** when you need the original machine-readable output.
+
+| Invoice | What to inspect |
+| --- | --- |
+| PP-1042 | Full receipt, payment and approved credit note. Review how the evidence and net balance appear together. |
+| PP-1043 | Receipt quantity is one unit against two invoiced. Evidence marks the missing quantity and the dispatch draft stays held. |
+| PP-1044 | Overdue account routed to manager review. Compare the current balance and aging. |
+| PP-1045 | Early payment reminder with full delivery receipt. |
+| PP-1046 | Service performance complaint against measured uptime. Review the telemetry and unresolved issue. |
+| PP-1047 | Full receipt, matched tax statement and separate MSME interest estimate. |
+| PP-1049 | Tax-component discrepancy and pending review. Inspect CGST, SGST and IGST separately. |
+
+The suggested task may differ by invoice because the model chooses among permitted review tasks using the supplied records. The deterministic ledger, evidence holds and tax checks remain visible in their respective workspaces.

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { PanelTitle, request } from "./shared";
+import { money, PanelTitle, request } from "./shared";
 import type { Invoice } from "./types";
 
 interface Configuration {
@@ -20,6 +20,81 @@ const labels: Record<string, string> = {
   read_ledger: "Financial ledger",
   read_gst: "Tax records",
 };
+
+
+interface EvidenceLine {
+  line: string;
+  description: string;
+  clause: string;
+  gaps: string[];
+  references: string[];
+  milestones: { milestone: string; required: boolean; result: string; evidence_ids: string[] }[];
+  submitted_records: { id: string; kind: string; quantity: number | null; verified: boolean; timestamp: string }[];
+}
+interface LedgerView {
+  currency: string;
+  unit: string;
+  original_principal: number;
+  original_gst: number;
+  credits: number;
+  debits: number;
+  payments: number;
+  total_owed: number;
+  effective_due: string;
+  contract_due: string;
+  dpd: number;
+  bucket: string;
+  interest_estimate: { amount: number | null; status: string; authority: string };
+}
+interface TaxView {
+  master_match: boolean;
+  statement: string;
+  itc_review: boolean;
+  adjusted_split: { cgst: number; sgst: number; igst: number; unallocated?: number };
+}
+interface Inspection {
+  tool: string;
+  result: unknown;
+}
+function objectValue(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : {};
+}
+function evidenceLines(value: unknown): EvidenceLine[] {
+  return Array.isArray(value) ? value as EvidenceLine[] : [];
+}
+function DisplayInspection({ step }: { step: Inspection }) {
+  if (step.tool === "read_evidence") {
+    return <div className="review-records">{evidenceLines(step.result).map(line => <section className="review-block" key={line.line}>
+      <h3>{line.line} · {line.description}</h3>
+      <p className="footnote">Contract reference · {line.clause}</p>
+      <div className="scroll"><table className="review-table"><thead><tr><th>Reference</th><th>Type</th><th>Accepted qty</th><th>Reviewed</th><th>Timestamp</th></tr></thead><tbody>
+        {line.submitted_records.map(record => <tr key={record.id}><td className="id">{record.id}</td><td>{record.kind}</td><td>{record.quantity ?? "—"}</td><td>{record.verified ? "Verified" : "Unverified"}</td><td>{record.timestamp}</td></tr>)}
+      </tbody></table></div>
+      <h4>Milestone checks</h4>
+      <div className="scroll"><table className="review-table"><thead><tr><th>Milestone</th><th>Required</th><th>Result</th><th>Evidence</th></tr></thead><tbody>
+        {line.milestones.map(item => <tr key={item.milestone}><td>{item.milestone.replaceAll("_", " ")}</td><td>{item.required ? "Yes" : "No"}</td><td>{item.result.toUpperCase()}</td><td>{item.evidence_ids.join(", ") || "—"}</td></tr>)}
+      </tbody></table></div>
+      {line.gaps.length > 0 && <p className="hold">Open checks · {line.gaps.join("; ")}</p>}
+    </section>)}</div>;
+  }
+  if (step.tool === "read_ledger") {
+    const ledger = objectValue(step.result) as unknown as LedgerView;
+    const rows: [string, number][] = [
+      ["Invoice principal", ledger.original_principal], ["Invoice tax", ledger.original_gst],
+      ["Approved debits", ledger.debits], ["Approved credits", ledger.credits],
+      ["Payments received", ledger.payments], ["Net outstanding", ledger.total_owed],
+    ];
+    return <div className="review-records"><dl className="review-fields">{rows.map(([label, amount]) => <div key={label}><dt>{label}</dt><dd>{money(amount)}</dd></div>)}</dl>
+      <dl className="review-fields"><div><dt>Effective due</dt><dd>{ledger.effective_due}</dd></div><div><dt>Contract due</dt><dd>{ledger.contract_due}</dd></div><div><dt>Age</dt><dd>{ledger.dpd} days · {ledger.bucket}</dd></div><div><dt>Interest estimate</dt><dd>{ledger.interest_estimate?.amount == null ? ledger.interest_estimate?.status : money(ledger.interest_estimate.amount)}</dd></div><div><dt>Rate source</dt><dd>{ledger.interest_estimate?.authority ?? "Not supplied"}</dd></div></dl></div>;
+  }
+  if (step.tool === "read_gst") {
+    const tax = objectValue(step.result) as unknown as TaxView;
+    const split = tax.adjusted_split ?? {cgst:0,sgst:0,igst:0};
+    return <dl className="review-fields"><div><dt>Account master</dt><dd>{tax.master_match ? "Matched" : "Review required"}</dd></div><div><dt>GSTR-2B statement</dt><dd>{tax.statement}</dd></div><div><dt>ITC age review</dt><dd>{tax.itc_review ? "Review required" : "No age flag"}</dd></div><div><dt>CGST / SGST / IGST</dt><dd>{[split.cgst,split.sgst,split.igst].map(money).join(" / ")}</dd></div>{split.unallocated != null && <div><dt>Unallocated tax</dt><dd>{money(split.unallocated)}</dd></div>}</dl>;
+  }
+  return <pre className="json">{JSON.stringify(step.result, null, 2)}</pre>;
+}
 
 export function Review({ invoice }: { invoice: Invoice }) {
   const [config, setConfig] = useState<Configuration | null>(null);
@@ -79,7 +154,8 @@ export function Review({ invoice }: { invoice: Invoice }) {
           <p className="micro">Proposed review task · {result.mode}</p>
           {result.inspections.map((step, index) => <details key={step.tool}>
             <summary>{index + 1}. {labels[step.tool] ?? step.tool}</summary>
-            <pre className="json">{JSON.stringify(step.result, null, 2)}</pre>
+            <DisplayInspection step={step} />
+            <details className="review-raw"><summary>Raw record JSON</summary><pre className="json">{JSON.stringify(step.result, null, 2)}</pre></details>
           </details>)}
         </>}
       </div>
